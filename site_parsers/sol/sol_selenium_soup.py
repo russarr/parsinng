@@ -7,15 +7,14 @@ import time
 import pickle
 
 
-class SolBookSelenium:
-    def get_sol_book_soup(book_url: str, driver: WebDriver) -> BeautifulSoup:
-        driver.get(book_url)
-        driver.find_element(By.ID, "det-link").click()
-        soup = _get_soup(driver)
+def get_sol_book_soup(book_url: str, driver: WebDriver) -> BeautifulSoup:
+    driver.get(book_url)
+    driver.find_element(By.ID, "det-link").click()
+    soup = _get_soup(driver)
 
-        # with open('temp_html2.html', 'w') as file:
-        #     file.write(page_source)
-        return soup
+    # with open('temp_html2.html', 'w') as file:
+    #     file.write(page_source)
+    return soup
 
 
 def get_sol_chapter_soup(chapter_url: str, driver: WebDriver) -> BeautifulSoup:

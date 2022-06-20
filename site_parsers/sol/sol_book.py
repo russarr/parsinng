@@ -1,18 +1,19 @@
 from bs4 import BeautifulSoup
-from common.common import ChapterLinkName
+from common.common import ChapterLinkName  # type: ignore
 from pathlib import Path
 from datetime import datetime
-from utils.exceptions import ParsingException
+from utils.exceptions import ParsingException, GetPageSourseException  # type: ignore
 from common.common import request_get_image
 import re
 from common.common import BookInfo
+from site_parsers.sol.sol_requests_soup import SolRequestsSoup
 import logging
-from typing import Literal
+from requests import Session
 
 logger = logging.getLogger(__name__)
 
 
-class SolBook(BookInfo):
+class SolBook(SolRequestsSoup):
     __slots__ = ("book_link",
                  "site_name",
                  "book_title",
@@ -34,8 +35,7 @@ class SolBook(BookInfo):
                  "book_series_order_position",
                  "book_votes_count",
                  "book_status",
-                 "book_monitoring_status",
-                 "book_soup")
+                 "book_monitoring_status")
 
     def __init__(self, book_link):
         super().__init__(book_link)
@@ -43,29 +43,36 @@ class SolBook(BookInfo):
 
     def get_storiesonline_book_info(self) -> None:
         logger.debug('Получаем информацию о книге')
-        self._get_author_title()
-        self._get_chapters_links()
+        book_soup = self.get_book_soup()
+        self._get_author_title(book_soup)
+        self._get_chapters_links(book_soup)
         self._create_book_directories()
-        self._get_book_cover()
+        self._get_book_cover(book_soup)
         self._get_book_details()
 
-    def _get_author_title(self) -> None:
-        author_name = self.book_soup.find('a', rel="author")
-        author_link = self.book_soup.find('a', rel="author")
-        book_title = self.book_soup.find('a', rel="bookmark")
+    def download_chapter(self, chapter_link_name: ChapterLinkName, session: Session) -> None: pass
+
+
+    def _get_author_title(self, book_soup: BeautifulSoup) -> None:
+        logger.debug('Получаем название и имя автора')
+        author_name = book_soup.find('a', rel="author")
+        author_link = book_soup.find('a', rel="author")
+        book_title = book_soup.find('a', rel="bookmark")
         if all([author_name, author_link, book_title]):
             self.author_name = author_name.get_text()
             self.author_link = author_link.get('href')
             self.book_title = book_title.get_text()
+            logger.debug(f'{self.author_name=}, {self.author_link=}, {self.book_title=}')
         else:
             logger.error('Не могу получить автора или название книги из soup')
             raise ParsingException('Не могу получить автора или название книги')
 
-    def _get_chapters_links(self) -> None:
+    def _get_chapters_links(self, book_soup: BeautifulSoup) -> None:
         logger.debug('получаем список ссылок на главы')
-        soup = self.book_soup.find('div', id="index-list")
+        soup = book_soup.find('div', id="index-list")
         if soup:
             self.chapters_links = tuple(ChapterLinkName(chapter_link=link[1].get('href'), chapter_name=link[1].text, chapter_order_position=link[0]) for link in enumerate(soup.findAll('a')))
+            logger.debug(f'{self.chapters_links=}')
         else:
             logger.error('Не умею загружать короткие истории без списка глав')
             raise ParsingException('Не умею загружать короткие истории без списка глав')
@@ -83,10 +90,11 @@ class SolBook(BookInfo):
             logger.exception(f'Ошибка создания папки на диске')
             raise ParsingException(f'Ошибка создания папки на диске {e}')
         self.book_directory = book_path
+        logger.debug(f'{self.book_directory=}')
 
-    def _get_book_cover(self) -> None:
+    def _get_book_cover(self, book_soup: BeautifulSoup) -> None:
         logger.debug('сохраянем обложку книги')
-        cover_link = self.book_soup.find('p', class_='c').find('img')
+        cover_link = book_soup.find('p', class_='c').find('img')
         if cover_link:
             cover_link = cover_link.get('src')
             image_response = request_get_image(cover_link)
@@ -95,17 +103,21 @@ class SolBook(BookInfo):
                 book_cover_path = self.book_directory.joinpath('Images/_cover.jpg')
                 try:
                     book_cover_path.write_bytes(image)
+                    logger.debug(f'обложку загрузили {book_cover_path}')
                 except FileNotFoundError as e:
                     logger.exception(f'Не могу сохранить обложку книги {self.book_link} на диск')
                     raise ParsingException(f'Не могу сохранить обложку на диск {e}')
             else:
                 logger.error(f'Не могу загрузить обложку, {image_response.status_code=}')
+        else:
+            logger.debug('обложки нет')
 
     def _get_book_details(self) -> None:
         logger.debug('Получаем описание и детали книги')
-        book_details = self.book_soup.find('div', id="s-details")
-        if book_details:
-            book_details = str(book_details)
+        book_details_soup = self._get_book_details_soup()
+        find_result = book_details_soup.find('p')
+        if book_details_soup:
+            book_details = str(find_result)
             self._get_book_description(book_details)
             self._get_book_sex_content(book_details)
             self._get_book_genre(book_details)
@@ -116,9 +128,26 @@ class SolBook(BookInfo):
             self._get_book_posted_date(book_details)
             self._get_book_updated_date(book_details)
             self._get_book_status(book_details)
+            logger.debug(f'{self.book_description=}\n{self.book_sex_content=}\n{self.book_genre=}\n{self.book_tags=}\n{self.book_size=}\n{self.book_votes_count=}\n{self.book_score=}')
+            logger.debug(f'{self.book_posted_date=}\n{self.book_updated_date=}\n{self.book_status=}')
         else:
             logger.error(f'Не могу загрузить описание книги {self.book_link}')
             raise ParsingException(f'Не могу загрузить описание книги {self.book_link}')
+
+    def _get_book_details_soup(self) -> BeautifulSoup:
+        session = self.create_sol_requests_session()
+        post_data = {
+            "cmd": "showDetails",
+            "data[]": self._get_sol_book_id()
+        }
+        response = session.post('https://storiesonline.net/res/responders/moreData.php', data=post_data)
+        if response.status_code == 200:
+            book_details_soup = self.create_soup(response.text)
+            return book_details_soup
+        else:
+            error_message = f'Не могу получить детали {self.book_link=}'
+            logger.error(error_message)
+            raise GetPageSourseException(error_message)
 
     def _get_book_description(self, book_details: str) -> None:
         book_description_search = re.search(r'<b>Synopsis:</b>(.*)<br/>', book_details)
@@ -180,7 +209,8 @@ class SolBook(BookInfo):
     def _get_book_status(self, book_details: str) -> None:
         book_status_search = re.search(r'<b>Posted:</b>\D*\d{4}-\d{2}-\d{2}(\D*)<b>Updated:</b>', book_details)
         book_status_html = book_status_search.group(1) if book_status_search else '<p></p>'
-        book_status_raw = BeautifulSoup(book_status_html, 'html5lib').find().get_text().strip()
+        book_status_raw = BeautifulSoup(book_status_html, 'html5lib').find()
+        book_status_raw = book_status_raw.get_text().strip()
         if 'Incomplete' in book_status_raw:
             self.book_status = 'Frozen'
         if re.search('<b>Concluded:</b>', book_details):
@@ -191,6 +221,19 @@ class SolBook(BookInfo):
         if self.book_status not in ('Frozen', 'Concluded', 'In progress'):
             logger.error(f'Неизвестный статус {book_status_raw}')
             raise ParsingException(f'Неизвестный статус {book_status_raw}')
+
+    def _get_sol_book_id(self) -> str:
+        if self.book_link:
+            book_id = self.book_link.split('/')[2]
+            if book_id.isdecimal():
+                logger.debug(f'{book_id=}')
+                return book_id
+            else:
+                logger.error(f'Проблема с получением book_id {self.book_link}: {book_id} должно быть число')
+                raise ParsingException(f'Проблема с получением book_id {self.book_link}: {book_id} должно быть число')
+        else:
+            logger.error(f'Проблема с получением book_id: отсутствует {self.book_link}')
+            raise ParsingException(f'Проблема с получением book_id: отсутствует {self.book_link}')
 
 
 def _print_book_info(book_info: BookInfo) -> None:

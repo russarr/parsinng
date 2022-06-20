@@ -46,12 +46,17 @@ LOGGING_CONFIG = {
         #     'level': 'DEBUG',
         #     'propagate': False
         # },
-        'site_parsers.sol.storiesonline_book': {
+        'site_parsers.sol.sol_book': {
             'handlers': ['console_handler', 'file_handler'],
             'level': 'DEBUG',
             'propagate': False
         },
         'site_parsers.sol.sol_request_authorization': {
+            'handlers': ['console_handler', 'file_handler'],
+            'level': 'INFO',
+            'propagate': False
+        },
+        'site_parsers.sol.sol_requests_soup': {
             'handlers': ['console_handler', 'file_handler'],
             'level': 'DEBUG',
             'propagate': False

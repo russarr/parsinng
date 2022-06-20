@@ -6,9 +6,10 @@ from typing import Literal, NamedTuple
 from db_moduls.db_common import BookDBCommon
 from bs4 import BeautifulSoup
 import requests
-import fake_useragent
+import fake_useragent  # type: ignore
 
 logger = logging.getLogger('logger')
+
 
 class ChapterLinkName(NamedTuple):
     chapter_link: str
@@ -50,40 +51,28 @@ class BookInfo:
     book_votes_count: int = field(repr=False, init=False)
     book_status: Literal['In progress', 'Concluded', 'Frozen'] = field(repr=False, init=False)
     book_monitoring_status: bool = field(repr=False, init=False, default=False)
-    book_soup: BeautifulSoup = field(repr=False, init=False)
-
-
-
-
 
 
 class Book(BookInfo, BookDBCommon):
-    pass
+    @staticmethod
+    def create_soup(page_source: str) -> BeautifulSoup:
+        soup = BeautifulSoup(page_source, 'html5lib')
+        return soup
 
 
-def parse_book_url(book_url):
-    logger.debug('парсим url')
-    if book_url.startswith('https://forums.sufficientvelocity.com'):
-        if not book_url.endswith('/threadmarks'):
-            book_url += '/threadmarks'
-        book_link = book_url.replace('https://forums.sufficientvelocity.com', '')
-        site_name = 'https://forums.sufficientvelocity.com'
-
-    elif 'https://forums.spacebattles.com/' in book_url:
-        if not book_url.endswith('/threadmarks'):
-            book_url += '/threadmarks'
-        book_link = book_url.replace('https://forums.spacebattles.com/', '')
-        site_name = 'https://forums.spacebattles.com/'
-
-    elif 'https://storiesonline.net/' in book_url:
-        book_link = book_url.replace('https://storiesonline.net/', '')
-        site_name = 'https://storiesonline.net/'
-
+def parse_book_url(book_url) -> tuple[str, str]:
+    logger.debug(f'парсим url {book_url}')
+    for site_name in ['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net']:
+        if book_url.startswith(site_name):
+            if site_name in ['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com'] and not book_url.endswith('/threadmarks'):
+                book_url += '/threadmarks'
+            book_link = book_url.replace(site_name, '')
+            logger.debug(f'результат парсинга:{site_name=}, {book_link=}')
+            return site_name, book_link
     else:
         logger.error(f'{book_url} - wrong url')
-        raise GetPageSourseException('wrong url')
+        raise GetPageSourseException(f'{book_url} - wrong url')
 
-    return book_link, site_name
 
 
 def request_get_image(image_link: str) -> requests.Response:

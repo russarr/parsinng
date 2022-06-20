@@ -100,11 +100,3 @@ class SolBookRequests:
                 pickle.dump(session.cookies, file)
         except FileNotFoundError:
             raise GetPageSourseException('Не могу сохранить cookies')
-
-
-def get_book_id(book_link: str) -> str:
-    book_id = book_link.split('/')[2]
-    if book_id.isdecimal():
-        return book_id
-    else:
-        raise Exception('Проблема с получением book_id')
