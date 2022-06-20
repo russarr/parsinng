@@ -1,14 +1,15 @@
-from bs4 import BeautifulSoup
-from common.common import ChapterLinkName  # type: ignore
+from bs4 import BeautifulSoup, Tag, NavigableString
+from common.common import ChapterLinkName, ChapterInfo  # type: ignore
 from pathlib import Path
 from datetime import datetime
 from utils.exceptions import ParsingException, GetPageSourseException  # type: ignore
 from common.common import request_get_image
 import re
 from common.common import BookInfo
-from site_parsers.sol.sol_requests_soup import SolRequestsSoup
+from site_parsers.sol.sol_requests_soup import SolRequestsSoup  # type: ignore
 import logging
 from requests import Session
+from common.common import raise_exception
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,11 @@ class SolBook(SolRequestsSoup):
         super().__init__(book_link)
         self.site_name = 'https://storiesonline.net'
 
-    def get_storiesonline_book_info(self) -> None:
+    def download_full_book(self):
+        """Функция скачачивания книги полностью"""
+        self._get_sol_book_info()
+
+    def _get_sol_book_info(self) -> None:
         logger.debug('Получаем информацию о книге')
         book_soup = self.get_book_soup()
         self._get_author_title(book_soup)
@@ -50,23 +55,112 @@ class SolBook(SolRequestsSoup):
         self._get_book_cover(book_soup)
         self._get_book_details()
 
-    def download_chapter(self, chapter_link_name: ChapterLinkName, session: Session) -> None:
+    def _download_sol_chapter(self, chapter_link_name: ChapterLinkName, session: Session) -> None:
         logger.debug(f'Скачиваем главу: {chapter_link_name}')
         if chapter_link_name:
-            chapter_link = chapter_link_name.chapter_link
-            chapter_name = chapter_link_name.chapter_name
-            chapter_order_position = chapter_link_name.chapter_order_position
-            session = self.create_sol_requests_session()
-            chapter_soup = self.get_chapter_soup(chapter_link, session)
-            chapter_info = self._get_chapter_info(chapter_soup)
+            chapter_info = ChapterInfo()
+            chapter_info.chapter_link = chapter_link_name.chapter_link
+            chapter_info.chapter_name = chapter_link_name.chapter_name
+            chapter_info.chapter_order_position = chapter_link_name.chapter_order_position
+            chapter_soup = self.get_chapter_soup(chapter_info.chapter_link, session)
+            chapter_info = self._get_chapter_info(chapter_soup, chapter_info)
+            self.chapters_info_list.append(chapter_info)
         else:
             error_message = f'Нет ссылки и имени главы'
             logger.error(error_message)
             raise ParsingException(error_message)
 
-    def _get_chapter_info(self, chapter_soup: BeautifulSoup): pass
+    def _get_chapter_info(self, chapter_soup: BeautifulSoup, chapter_info: ChapterInfo) -> ChapterInfo:
+        logger.debug('Парсим текс главы')
+        chapter_soup = chapter_soup.find('article')
+        if not chapter_soup:
+            raise_exception(ParsingException, 'Не могу найти тэг article')
+        chapter_info.chapter_posted_date, chapter_info.chapter_updated_date = self._get_chapter_dates(chapter_soup)
+        chapter_soup = self._clear_chapter_soup(chapter_soup)
+        chapter_soup = self._get_chapter_images(chapter_soup)
+        chapter_text = self._get_chapter_text(chapter_soup)
+        self._save_chapter_text_on_disk(chapter_text, chapter_file_name=chapter_info.chapter_file_name, book_directory=self.book_directory)
+        return chapter_info
 
+    @staticmethod
+    def _get_chapter_dates(chapter_soup) -> tuple[int, int]:
+        logger.debug('Получаем даты в главе')
+        chapter_dates = chapter_soup.find_all('div', class_="date")
+        posted_date, updated_date = 0, 0
+        for date in chapter_dates:
+            posted_date_re = re.search(r'Posted:\D+(\d{13})', str(date))
+            if posted_date_re:
+                posted_date = int(posted_date_re.group(1)[:-3])  # type: ignore
+            updated_date_re = re.search(r'Updated:\D+(\d{13})', str(date))
+            if updated_date_re:
+                updated_date = int(updated_date_re.group(1)[:-3])  # type: ignore
+        if posted_date == 0 and updated_date == 0:
+            raise_exception(ParsingException, 'Ошибка получения дат в главе')
+        logger.debug(f'{posted_date=}, {updated_date=}')
+        return posted_date, updated_date
 
+    @staticmethod
+    def _clear_chapter_soup(chapter_soup: BeautifulSoup | Tag | NavigableString) -> BeautifulSoup:
+        """функция для удаления со страницы даты, ссылки на слудующую главу, формы голосования и т.д."""
+        logger.debug('Удаляем лишнее из текста')
+        tags_to_clear = ['div[class="date"]', 'a[accesskey="n"]', 'form[id="voteForm"]', 'div[class="end-note"]', 'div[class="vform"]']
+        for tag in tags_to_clear:
+            tag_to_delete = chapter_soup.select_one(tag)
+            if tag_to_delete:
+                tag_to_delete.decompose()
+        return chapter_soup
+
+    def _get_chapter_images(self, soup: BeautifulSoup) -> BeautifulSoup:
+        """функция получения картинок в главе"""
+        logger.debug('сохраняем изображения из текста')
+        images = soup.findAll('img')
+        for image in images:
+            image_link = image.get('src')
+            local_image_path = self._save_image(image_link, self.book_directory)
+            if local_image_path:
+                image['src'] = '../' + local_image_path  # добавлил ../ вначале адреса тэга, чтобы работатла в .epub книгах
+        return soup
+
+    @staticmethod
+    def _save_image(image_link: str, book_path: Path) -> str:
+        image_name = 'Images/' + image_link.split('/')[-1]
+        image_path = book_path.joinpath(image_name)
+        if image_path.exists():
+            return image_name
+        else:
+            image_response = request_get_image(image_link)
+            if image_response.status_code == 200:
+                image = image_response.content
+                image_path.write_bytes(image)
+                return image_name
+            elif image_response.status_code == 404:
+                return image_name
+            else:
+                raise_exception(ParsingException, f'Ошибка {image_response.status_code} загрузки изображения {image_name} в тексте главы')
+
+    def _get_chapter_text(self, soup: BeautifulSoup) -> str:
+        logger.debug('Получаем финальный текст главы')
+        chapter_text = ''
+        for block in soup:
+            chapter_text += str(block).strip()
+        chapter_text = self._replace_unreadable_symbols(chapter_text)
+        return chapter_text
+
+    @staticmethod
+    def _replace_unreadable_symbols(chapter_text: str) -> str:
+        logger.debug('Заменяем нечитаемые символы')
+        for symbol in '‘’':
+            chapter_text = chapter_text.replace(symbol, "'")
+        for symbol in '“”':
+            chapter_text = chapter_text.replace(symbol, '"')
+        return chapter_text
+
+    @staticmethod
+    def _save_chapter_text_on_disk(chapter_text, chapter_file_name: str, book_directory: Path) -> Path:
+        logger.debug('Сохраняем текст главы на диск')
+        chapter_path = book_directory.joinpath(f'Text/{chapter_file_name}')
+        chapter_path.write_text(chapter_text, encoding='utf-8')
+        return chapter_path
 
     def _get_author_title(self, book_soup: BeautifulSoup) -> None:
         logger.debug('Получаем название и имя автора')
@@ -74,13 +168,12 @@ class SolBook(SolRequestsSoup):
         author_link = book_soup.find('a', rel="author")
         book_title = book_soup.find('a', rel="bookmark")
         if all([author_name, author_link, book_title]):
-            self.author_name = author_name.get_text()
-            self.author_link = author_link.get('href')
-            self.book_title = book_title.get_text()
+            self.author_name = author_name.get_text()  # type: ignore
+            self.author_link = author_link.get('href')  # type: ignore
+            self.book_title = book_title.get_text()  # type: ignore
             logger.debug(f'{self.author_name=}, {self.author_link=}, {self.book_title=}')
         else:
-            logger.error('Не могу получить автора или название книги из soup')
-            raise ParsingException('Не могу получить автора или название книги')
+            raise_exception(ParsingException, 'Не могу получить автора или название книги из soup')
 
     def _get_chapters_links(self, book_soup: BeautifulSoup) -> None:
         logger.debug('получаем список ссылок на главы')

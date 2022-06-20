@@ -74,6 +74,10 @@ def parse_book_url(book_url) -> tuple[str, str]:
         raise GetPageSourseException(f'{book_url} - wrong url')
 
 
+def raise_exception(exception, exception_message):
+    logger.error(exception_message)
+    raise exception(exception_message)
+
 
 def request_get_image(image_link: str) -> requests.Response:
     user = fake_useragent.UserAgent().random
