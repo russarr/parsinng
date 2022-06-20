@@ -20,23 +20,21 @@ class SolRequestsSoup(SolBookRequests, Book):
     def get_chapter_soup(self, chapter_link: str, session: Session) -> BeautifulSoup:
         chapter_url = self.site_name + chapter_link
         response = session.get(chapter_url)
-        chapter_content_1 = response.text.strip()
-        chapter_content_2 = self._get_chapter_content_2(session, chapter_content_1)
-        chapter_soup = self.create_soup(chapter_content_1 + '\n' + chapter_content_2)
-        return chapter_soup
+        chapter_soup_1 = self.create_soup(response.text.strip())
+        chapter_soup_full = self._get_chapter_content_2(session, chapter_soup_1)
+        return chapter_soup_full
 
-    def _get_chapter_content_2(self, session: Session, chapter_content_1: str) -> str:
-        chapter_soup_1 = self.create_soup(chapter_content_1)
-        check_bot_protection = chapter_soup_1.find('a', onclick="ld1()")
-        if check_bot_protection:
+    def _get_chapter_content_2(self, session: Session, chapter_soup_1: BeautifulSoup) -> BeautifulSoup:
+        bot_protection_block = chapter_soup_1.find('div', id="sr")
+        if bot_protection_block:
             logger.debug('Есть защита от ботов')
-            chapter_soup_2 = self._bypass_bot_protection(session, chapter_soup_1)
-            return chapter_soup_2
+            chapter_soup_full = self._bypass_bot_protection(session, chapter_soup_1)
+            return chapter_soup_full
         else:
             logger.info('Глава короткая, без защиты')
-            return ''
+            return chapter_soup_1
 
-    def _bypass_bot_protection(self, session: Session, chapter_soup_1: BeautifulSoup) -> str:
+    def _bypass_bot_protection(self, session: Session, chapter_soup_1: BeautifulSoup) -> BeautifulSoup:
         data_1 = self._get_requests_data_1(chapter_soup_1)
         response = session.post('https://storiesonline.net' + '/res/responders/tl.php', data=data_1)
         if response.status_code == 200 and len(response.text) > 10:
@@ -45,7 +43,12 @@ class SolRequestsSoup(SolBookRequests, Book):
             logger.debug('Обошли первый шаг защиты')
             if response.status_code == 200 and len(response.text) > 100:
                 logger.debug('Обошли второй шаг защиты')
-                return response.text.strip()
+                chapter_soup_2 = self.create_soup('\n' + response.text.strip()).find()
+                tag = chapter_soup_1.find('div', id="sr")
+                if tag:
+                    tag.replace_with(chapter_soup_2)
+                logger.debug('добавили скрытую часть текста')
+                return chapter_soup_1
             else:
                 error_message = f'Ошибка получения второй части токена {response.status_code=}, {len(response.text)}'
                 logger.error(error_message)

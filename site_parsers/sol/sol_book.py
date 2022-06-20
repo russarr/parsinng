@@ -50,7 +50,22 @@ class SolBook(SolRequestsSoup):
         self._get_book_cover(book_soup)
         self._get_book_details()
 
-    def download_chapter(self, chapter_link_name: ChapterLinkName, session: Session) -> None: pass
+    def download_chapter(self, chapter_link_name: ChapterLinkName, session: Session) -> None:
+        logger.debug(f'Скачиваем главу: {chapter_link_name}')
+        if chapter_link_name:
+            chapter_link = chapter_link_name.chapter_link
+            chapter_name = chapter_link_name.chapter_name
+            chapter_order_position = chapter_link_name.chapter_order_position
+            session = self.create_sol_requests_session()
+            chapter_soup = self.get_chapter_soup(chapter_link, session)
+            chapter_info = self._get_chapter_info(chapter_soup)
+        else:
+            error_message = f'Нет ссылки и имени главы'
+            logger.error(error_message)
+            raise ParsingException(error_message)
+
+    def _get_chapter_info(self, chapter_soup: BeautifulSoup): pass
+
 
 
     def _get_author_title(self, book_soup: BeautifulSoup) -> None:
