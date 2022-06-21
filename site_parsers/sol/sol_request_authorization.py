@@ -1,13 +1,14 @@
 import time
 
 from requests import Session
-import fake_useragent
+import fake_useragent  # type: ignore
 import pickle
 from bs4 import BeautifulSoup
 import dotenv
 from os import getenv
-from utils.exceptions import GetPageSourseException
+from common.exceptions import GetPageSourseException  # type: ignore
 import logging
+from common.utils import raise_exception  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,7 @@ class SolBookRequests:
             n -= 1
             time.sleep(1)
             if n == 0:
-                logger.error('Проблема авторизации sol')
-                raise GetPageSourseException('Проблема авторизации sol')
+                raise_exception(GetPageSourseException, 'Проблема авторизации sol')
         self._save_sol_cookiejar(session)
         return session
 
@@ -73,12 +73,17 @@ class SolBookRequests:
     def _get_auth_data() -> dict[str, str]:
         dotenv.load_dotenv('utils/.env')
         logger.debug('загружаем данные авторизации')
-        login = getenv('SOL_LOGIN')
-        password = getenv('SOL_PASSWORD')
-        data = {"email": login,
-                "password": password,
-                "cmd": "LOGIN"}
-        return data
+        login = getenv('SOL_LOGIN', default='')
+        password = getenv('SOL_PASSWORD', default='')
+        if all([login, password]):
+            data = {"email": login,
+                    "password": password,
+                    "cmd": "LOGIN"}
+            return data
+        else:
+            error_message = 'Не могу загрузить login, password из переменных окружения'
+            logger.error(error_message)
+            raise GetPageSourseException(error_message)
 
     @staticmethod
     def _load_sol_cookiejar(session: Session) -> Session:
@@ -99,4 +104,4 @@ class SolBookRequests:
             with open('temp/cookies_requests.pickle', 'wb') as file:
                 pickle.dump(session.cookies, file)
         except FileNotFoundError:
-            raise GetPageSourseException('Не могу сохранить cookies')
+            raise_exception(GetPageSourseException, 'Не могу сохранить cookies')

@@ -1,20 +1,24 @@
-from bs4 import BeautifulSoup, Tag, NavigableString
+import random
+import time
+import bs4
+from bs4 import BeautifulSoup
 from common.common import ChapterLinkName, ChapterInfo  # type: ignore
 from pathlib import Path
 from datetime import datetime
-from utils.exceptions import ParsingException, GetPageSourseException  # type: ignore
-from common.common import request_get_image
+from common.exceptions import ParsingException, GetPageSourseException  # type: ignore
+from common.utils import request_get_image  # type: ignore
 import re
 from common.common import BookInfo
 from site_parsers.sol.sol_requests_soup import SolRequestsSoup  # type: ignore
 import logging
 from requests import Session
-from common.common import raise_exception
+from common.utils import raise_exception, create_soup
+from db_modules.db_common import BookDB
 
 logger = logging.getLogger(__name__)
 
 
-class SolBook(SolRequestsSoup):
+class SolBook(SolRequestsSoup, BookDB):
     __slots__ = ("book_link",
                  "site_name",
                  "book_title",
@@ -44,24 +48,30 @@ class SolBook(SolRequestsSoup):
 
     def download_full_book(self):
         """Функция скачачивания книги полностью"""
-        self._get_sol_book_info()
+        logger.debug('Начинаем скачивание книги')
+        session = self.create_sol_requests_session()
+        self._get_sol_book_info(session)
+        for chapter in self.chapters_links:
+            self._download_sol_chapter(chapter, session)
+            time.sleep(random.randint(1, 3))
+        self.add_book_to_db()
 
-    def _get_sol_book_info(self) -> None:
+    def _get_sol_book_info(self, session: Session) -> None:
         logger.debug('Получаем информацию о книге')
-        book_soup = self.get_book_soup()
+        book_soup = self.get_book_soup(session)
         self._get_author_title(book_soup)
         self._get_chapters_links(book_soup)
         self._create_book_directories()
         self._get_book_cover(book_soup)
-        self._get_book_details()
+        self._get_book_details(session)
 
     def _download_sol_chapter(self, chapter_link_name: ChapterLinkName, session: Session) -> None:
         logger.debug(f'Скачиваем главу: {chapter_link_name}')
         if chapter_link_name:
-            chapter_info = ChapterInfo()
-            chapter_info.chapter_link = chapter_link_name.chapter_link
-            chapter_info.chapter_name = chapter_link_name.chapter_name
-            chapter_info.chapter_order_position = chapter_link_name.chapter_order_position
+            chapter_info = ChapterInfo(chapter_link=chapter_link_name.chapter_link,
+                                       chapter_name=chapter_link_name.chapter_name,
+                                       chapter_file_name=f'chapter_{str(chapter_link_name.chapter_order_position).zfill(4)}.html',
+                                       book_link=self.book_link)
             chapter_soup = self.get_chapter_soup(chapter_info.chapter_link, session)
             chapter_info = self._get_chapter_info(chapter_soup, chapter_info)
             self.chapters_info_list.append(chapter_info)
@@ -72,14 +82,16 @@ class SolBook(SolRequestsSoup):
 
     def _get_chapter_info(self, chapter_soup: BeautifulSoup, chapter_info: ChapterInfo) -> ChapterInfo:
         logger.debug('Парсим текс главы')
-        chapter_soup = chapter_soup.find('article')
-        if not chapter_soup:
+        chapter_soup = create_soup(str(chapter_soup.find('article')))
+        if chapter_soup:
+            chapter_info.chapter_posted_date, chapter_info.chapter_updated_date = self._get_chapter_dates(chapter_soup)
+            chapter_soup = self._clear_chapter_soup(chapter_soup)
+            chapter_soup = self._get_chapter_images(chapter_soup)
+            chapter_text = self._get_chapter_text(chapter_soup)
+            self._save_chapter_text_on_disk(chapter_text, chapter_file_name=chapter_info.chapter_file_name, book_directory=self.book_directory)
+        else:
             raise_exception(ParsingException, 'Не могу найти тэг article')
-        chapter_info.chapter_posted_date, chapter_info.chapter_updated_date = self._get_chapter_dates(chapter_soup)
-        chapter_soup = self._clear_chapter_soup(chapter_soup)
-        chapter_soup = self._get_chapter_images(chapter_soup)
-        chapter_text = self._get_chapter_text(chapter_soup)
-        self._save_chapter_text_on_disk(chapter_text, chapter_file_name=chapter_info.chapter_file_name, book_directory=self.book_directory)
+
         return chapter_info
 
     @staticmethod
@@ -100,7 +112,7 @@ class SolBook(SolRequestsSoup):
         return posted_date, updated_date
 
     @staticmethod
-    def _clear_chapter_soup(chapter_soup: BeautifulSoup | Tag | NavigableString) -> BeautifulSoup:
+    def _clear_chapter_soup(chapter_soup: BeautifulSoup) -> BeautifulSoup:
         """функция для удаления со страницы даты, ссылки на слудующую главу, формы голосования и т.д."""
         logger.debug('Удаляем лишнее из текста')
         tags_to_clear = ['div[class="date"]', 'a[accesskey="n"]', 'form[id="voteForm"]', 'div[class="end-note"]', 'div[class="vform"]']
@@ -136,13 +148,13 @@ class SolBook(SolRequestsSoup):
             elif image_response.status_code == 404:
                 return image_name
             else:
-                raise_exception(ParsingException, f'Ошибка {image_response.status_code} загрузки изображения {image_name} в тексте главы')
+                error_message = f'Ошибка {image_response.status_code} загрузки изображения {image_name} в тексте главы'
+                logger.error(error_message)
+                raise ParsingException(error_message)
 
     def _get_chapter_text(self, soup: BeautifulSoup) -> str:
         logger.debug('Получаем финальный текст главы')
-        chapter_text = ''
-        for block in soup:
-            chapter_text += str(block).strip()
+        chapter_text = str(soup).strip()
         chapter_text = self._replace_unreadable_symbols(chapter_text)
         return chapter_text
 
@@ -159,7 +171,10 @@ class SolBook(SolRequestsSoup):
     def _save_chapter_text_on_disk(chapter_text, chapter_file_name: str, book_directory: Path) -> Path:
         logger.debug('Сохраняем текст главы на диск')
         chapter_path = book_directory.joinpath(f'Text/{chapter_file_name}')
-        chapter_path.write_text(chapter_text, encoding='utf-8')
+        try:
+            chapter_path.write_text(chapter_text, encoding='utf-8')
+        except PermissionError:
+            raise_exception(ParsingException, f'Не могу сохранить на диск {chapter_path=}')
         return chapter_path
 
     def _get_author_title(self, book_soup: BeautifulSoup) -> None:
@@ -179,6 +194,7 @@ class SolBook(SolRequestsSoup):
         logger.debug('получаем список ссылок на главы')
         soup = book_soup.find('div', id="index-list")
         if soup:
+            assert isinstance(soup, bs4.Tag)
             self.chapters_links = tuple(ChapterLinkName(chapter_link=link[1].get('href'), chapter_name=link[1].text, chapter_order_position=link[0]) for link in enumerate(soup.findAll('a')))
             logger.debug(f'{self.chapters_links=}')
         else:
@@ -187,7 +203,7 @@ class SolBook(SolRequestsSoup):
 
     def _create_book_directories(self) -> None:
         logger.debug('создаем директории на диске')
-        book_directory = ['book_database'] + self.author_link.split('/')[-1:] + self.book_link.split('/')[-1:]
+        book_directory = ['book_database'] + self.author_link.split('/')[-1:] + self.book_link.split('/')[-1:]  # type: ignore
         book_path = Path(*book_directory)
         book_images_path = book_path.joinpath('Images')
         book_texts_path = book_path.joinpath('Text')
@@ -202,9 +218,9 @@ class SolBook(SolRequestsSoup):
 
     def _get_book_cover(self, book_soup: BeautifulSoup) -> None:
         logger.debug('сохраянем обложку книги')
-        cover_link = book_soup.find('p', class_='c').find('img')
+        cover_link = book_soup.find('p', class_='c').find('img')  # type: ignore
         if cover_link:
-            cover_link = cover_link.get('src')
+            cover_link = cover_link.get('src')  # type: ignore
             image_response = request_get_image(cover_link)
             if image_response.status_code == 200:
                 image = image_response.content
@@ -220,9 +236,9 @@ class SolBook(SolRequestsSoup):
         else:
             logger.debug('обложки нет')
 
-    def _get_book_details(self) -> None:
+    def _get_book_details(self, session: Session) -> None:
         logger.debug('Получаем описание и детали книги')
-        book_details_soup = self._get_book_details_soup()
+        book_details_soup = self._get_book_details_soup(session)
         find_result = book_details_soup.find('p')
         if book_details_soup:
             book_details = str(find_result)
@@ -242,15 +258,14 @@ class SolBook(SolRequestsSoup):
             logger.error(f'Не могу загрузить описание книги {self.book_link}')
             raise ParsingException(f'Не могу загрузить описание книги {self.book_link}')
 
-    def _get_book_details_soup(self) -> BeautifulSoup:
-        session = self.create_sol_requests_session()
+    def _get_book_details_soup(self, session: Session) -> BeautifulSoup:
         post_data = {
             "cmd": "showDetails",
             "data[]": self._get_sol_book_id()
         }
         response = session.post('https://storiesonline.net/res/responders/moreData.php', data=post_data)
         if response.status_code == 200:
-            book_details_soup = self.create_soup(response.text)
+            book_details_soup = create_soup(response.text)
             return book_details_soup
         else:
             error_message = f'Не могу получить детали {self.book_link=}'
@@ -282,22 +297,23 @@ class SolBook(SolRequestsSoup):
         self.book_tags = book_tags
 
     def _get_book_size(self, book_details: str) -> None:
-        book_size_search = re.search(r'<b>Size:</b>\D*(\d+)\D*KB', book_details)
+        book_size_search = re.search(r'<b>Size:</b>\s*(\d+)\s*KB', book_details)
         book_size = int(book_size_search.group(1).strip()) if book_size_search else 0
         self.book_size = book_size
 
     def _get_book_votes_count(self, book_details: str) -> None:
-        book_votes_count_search = re.search(r'<b>Votes:</b>\D*(\d+)', book_details)
+        book_votes_count_search = re.search(r'<b>Votes:</b>\s*(\d+)\s', book_details)
         book_votes_count = int(book_votes_count_search.group(1).strip()) if book_votes_count_search else 0
         self.book_votes_count = book_votes_count
 
     def _get_book_score(self, book_details: str) -> None:
-        book_score_search = re.search(r'<b>Score:</b>\D*(\d*\.\d+|\d+)', book_details)
+        book_score_search = re.search(r'<b>Score:</b>\s*(\d*\.\d+|\d+)\\n', book_details)
+        logger.debug(f'{book_score_search=}')
         book_score = float(book_score_search.group(1).strip()) if book_score_search else 0.0
         self.book_score = book_score
 
     def _get_book_posted_date(self, book_details: str) -> None:
-        book_posted_date_search = re.search(r'<b>Posted:</b>\D*(\d{4}-\d{2}-\d{2})', book_details)
+        book_posted_date_search = re.search(r'<b>Posted:</b>\s*(\d{4}-\d{2}-\d{2})', book_details)
         if book_posted_date_search:
             book_posted_date = book_posted_date_search.group(1)
             book_posted_date = int(datetime.strptime(book_posted_date, '%Y-%m-%d').timestamp())
@@ -306,7 +322,7 @@ class SolBook(SolRequestsSoup):
         self.book_posted_date = book_posted_date
 
     def _get_book_updated_date(self, book_details: str) -> None:
-        book_updated_date_search = re.search(r'<b>(Updat|Conclud)ed:</b>\D*(\d{4}-\d{2}-\d{2})', book_details)
+        book_updated_date_search = re.search(r'<b>(Updat|Conclud)ed:</b>\s*(\d{4}-\d{2}-\d{2})', book_details)
         if book_updated_date_search:
             book_updated_date = book_updated_date_search.group(2)
             book_updated_date = int(datetime.strptime(book_updated_date, '%Y-%m-%d').timestamp())
@@ -317,7 +333,7 @@ class SolBook(SolRequestsSoup):
     def _get_book_status(self, book_details: str) -> None:
         book_status_search = re.search(r'<b>Posted:</b>\D*\d{4}-\d{2}-\d{2}(\D*)<b>Updated:</b>', book_details)
         book_status_html = book_status_search.group(1) if book_status_search else '<p></p>'
-        book_status_raw = BeautifulSoup(book_status_html, 'html5lib').find()
+        book_status_raw = create_soup(book_status_html).find()
         book_status_raw = book_status_raw.get_text().strip()
         if 'Incomplete' in book_status_raw:
             self.book_status = 'Frozen'

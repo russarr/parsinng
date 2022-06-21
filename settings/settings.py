@@ -61,5 +61,10 @@ LOGGING_CONFIG = {
             'level': 'DEBUG',
             'propagate': False
         },
+        'db_modules.db_common': {
+            'handlers': ['console_handler', 'file_handler'],
+            'level': 'DEBUG',
+            'propagate': False
+        },
     }
 }

@@ -6,7 +6,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, InvalidCookieDomainException
 from selenium.webdriver.firefox.webdriver import WebDriver
-from utils.exceptions import GetPageSourseException
+from common.exceptions import GetPageSourseException  # type: ignore
 from dotenv import load_dotenv
 from pathlib import Path
 import logging

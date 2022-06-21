@@ -1,26 +1,29 @@
-from site_parsers.sol.sol_request_authorization import SolBookRequests
-from common.common import Book, ChapterLinkName
+import random
+import time
+
+from site_parsers.sol.sol_request_authorization import SolBookRequests  # type: ignore
+from common.common import BookInfo  # type: ignore
 from bs4 import BeautifulSoup, Tag, NavigableString
 from requests import Session
-from utils.exceptions import ParsingException
 import logging
+from common.utils import create_soup  # type: ignore
+from common.exceptions import ParsingException  # type: ignore
 
 logger = logging.getLogger(__name__)
 
 
-class SolRequestsSoup(SolBookRequests, Book):
-    def get_book_soup(self) -> BeautifulSoup:
+class SolRequestsSoup(SolBookRequests, BookInfo):
+    def get_book_soup(self, session: Session) -> BeautifulSoup:
         logger.debug('Получаем book_soup')
-        session = self.create_sol_requests_session()
         book_url = self.site_name + self.book_link
         reponse = session.get(book_url)
-        book_soup = self.create_soup(reponse.text)
+        book_soup = create_soup(reponse.text)
         return book_soup
 
     def get_chapter_soup(self, chapter_link: str, session: Session) -> BeautifulSoup:
         chapter_url = self.site_name + chapter_link
         response = session.get(chapter_url)
-        chapter_soup_1 = self.create_soup(response.text.strip())
+        chapter_soup_1 = create_soup(response.text.strip())
         chapter_soup_full = self._get_chapter_content_2(session, chapter_soup_1)
         return chapter_soup_full
 
@@ -39,11 +42,12 @@ class SolRequestsSoup(SolBookRequests, Book):
         response = session.post('https://storiesonline.net' + '/res/responders/tl.php', data=data_1)
         if response.status_code == 200 and len(response.text) > 10:
             data_2 = self._get_requests_data_2(response.text)
+            time.sleep(random.randint(1, 3))
             response = session.post('https://storiesonline.net' + '/res/responders/tl.php', data=data_2)
             logger.debug('Обошли первый шаг защиты')
             if response.status_code == 200 and len(response.text) > 100:
                 logger.debug('Обошли второй шаг защиты')
-                chapter_soup_2 = self.create_soup('\n' + response.text.strip()).find()
+                chapter_soup_2 = create_soup('\n' + response.text.strip()).find()
                 tag = chapter_soup_1.find('div', id="sr")
                 if tag:
                     tag.replace_with(chapter_soup_2)
