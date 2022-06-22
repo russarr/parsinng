@@ -58,7 +58,7 @@ LOGGING_CONFIG = {
         },
         'site_parsers.sol.sol_requests_soup': {
             'handlers': ['console_handler', 'file_handler'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': False
         },
         'db_modules.db_common': {
@@ -67,6 +67,11 @@ LOGGING_CONFIG = {
             'propagate': False
         },
         'epub.epub': {
+            'handlers': ['console_handler', 'file_handler'],
+            'level': 'INFO',
+            'propagate': False
+        },
+        'site_parsers.sol.sol_monitoring': {
             'handlers': ['console_handler', 'file_handler'],
             'level': 'DEBUG',
             'propagate': False

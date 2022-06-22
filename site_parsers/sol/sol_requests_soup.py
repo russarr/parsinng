@@ -3,7 +3,6 @@ import time
 
 import bs4
 
-from site_parsers.sol.sol_request_authorization import SolBookRequests  # type: ignore
 from common.common import BookInfo  # type: ignore
 from bs4 import BeautifulSoup, Tag, NavigableString
 from requests import Session
@@ -14,11 +13,15 @@ from common.exceptions import ParsingException  # type: ignore
 logger = logging.getLogger(__name__)
 
 
-class SolRequestsSoup(SolBookRequests, BookInfo):
+class SolRequestsSoup(BookInfo):
     def get_book_soup(self, session: Session) -> BeautifulSoup:
         logger.debug('Получаем book_soup')
         book_url = self.site_name + self.book_link
         reponse = session.get(book_url)
+        if '<h2>Error! Too many concurrent accesses. Try later.</h2>' in reponse.text:
+            error_message = 'Error! Too many concurrent accesses. Try later.'
+            logger.error(error_message)
+            raise ParsingException(error_message)
         book_soup = create_soup(reponse.text)
         return book_soup
 

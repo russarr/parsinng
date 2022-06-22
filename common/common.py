@@ -31,7 +31,7 @@ class BookInfo:
     author_name: str = ''
     author_link: str = ''
     book_directory: Path = field(repr=False, init=False)
-    chapters_links: tuple[ChapterLinkName, ...] | None = None
+    chapters_links: tuple[ChapterLinkName, ...] = field(default_factory=tuple)
     book_size: int = 0
     book_score: float = 0.0
     chapters_info_list: list[ChapterInfo] = field(default_factory=list)

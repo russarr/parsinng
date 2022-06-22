@@ -33,6 +33,7 @@ class BookEpub(BookInfo):
                     zf.writestr('OEBPS/Text/' + chapter[0], chapter[1])
                 for image in images_files:
                     zf.write(image[1], 'OEBPS/Images/' + image[0])
+                logger.info(f'Сохранена книга {save_path}')
         except OSError as e:
             error_message = f'Ошибка при архивации epub файла: {e}'
             raise CompileException(error_message)

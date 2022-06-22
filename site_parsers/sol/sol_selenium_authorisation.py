@@ -68,17 +68,19 @@ def _save_cookies(driver: WebDriver) -> None:
         pickle.dump(driver.get_cookies(), file)
 
 
-def _load_auth_data():
+def _load_auth_data() -> tuple[str, str]:
     """функция загружает данные из переменных окружения"""
     logger.debug('берем данные для авторизации из переменных окружения')
     dotenv_path = Path('utils/.env')
     load_dotenv(dotenv_path=dotenv_path)
     login = getenv('SOL_LOGIN')
     password = getenv('SOL_PASSWORD')
-    if not any([login, password]):
-        logger.error('не могу загрузить данные для авторизации из переменных окружения')
-        raise GetPageSourseException('не могу загрузить данные для авторизации из переменных окружения')
-    return login, password
+    if login is not None and password is not None:
+        return login, password
+    else:
+        error_message = 'не могу загрузить данные для авторизации из переменных окружения'
+        logger.error(error_message)
+        raise GetPageSourseException(error_message)
 
 # if __name__ == '__main__':
 #     driver = get_driver('browser')

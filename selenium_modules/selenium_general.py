@@ -1,9 +1,10 @@
 from selenium import webdriver
+from selenium.webdriver.firefox.webdriver import WebDriver
 from typing import Literal
 from pathlib import Path
 
 
-def get_driver(mode: Literal['browser', 'no_browser'] = 'browser'):
+def get_driver(mode: Literal['browser', 'no_browser'] = 'browser') -> WebDriver:
     geckodriver_path = Path('selenium_modules/geckodriver.exe')
     log_path = Path('temp/logs/geckodriver.log')
     print(log_path)

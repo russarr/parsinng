@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger(__name__)
 
 
-def parse_book_url(book_url) -> tuple[str, str]:
+def parse_book_url(book_url: str) -> tuple[str, str]:
     logger.debug(f'парсим url {book_url}')
     for site_name in ['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net']:
         if book_url.startswith(site_name):
@@ -21,9 +21,9 @@ def parse_book_url(book_url) -> tuple[str, str]:
         raise GetPageSourseException(f'{book_url} - wrong url')
 
 
-def raise_exception(exception, exception_message):
-    logger.error(exception_message)
-    raise exception(exception_message)
+# def raise_exception(exception, exception_message):
+#     logger.error(exception_message)
+#     raise exception(exception_message)
 
 
 def request_get_image(image_link: str) -> requests.Response:
