@@ -27,23 +27,23 @@ class ChapterInfo:
 class BookInfo:
     book_link: str
     site_name: Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net'] = field(init=False)
-    book_title: str = field(repr=False, init=False)
-    author_name: str = field(repr=False, init=False)
-    author_link: str = field(repr=False, init=False)
+    book_title: str = ''
+    author_name: str = ''
+    author_link: str = ''
     book_directory: Path = field(repr=False, init=False)
-    chapters_links: tuple[ChapterLinkName, ...] = field(repr=False, init=False)
-    book_size: int = field(repr=False, init=False)
-    book_score: float = field(repr=False, init=False)
+    chapters_links: tuple[ChapterLinkName, ...] | None = None
+    book_size: int = 0
+    book_score: float = 0.0
     chapters_info_list: list[ChapterInfo] = field(default_factory=list)
-    book_sex_content: str = field(repr=False, init=False)
-    book_posted_date: int = field(repr=False, init=False)
-    book_updated_date: int = field(repr=False, init=False)
-    book_download_date: int = field(repr=False, init=False)
-    book_description: str = field(repr=False, init=False)
-    book_genre: str = field(repr=False, init=False)
-    book_series: str = field(default='')
-    book_tags: tuple[str, ...] = field(repr=False, init=False)
-    book_series_order_position: int = field(default=0)
-    book_votes_count: int = field(repr=False, init=False)
+    book_sex_content: str = ''
+    book_posted_date: int = 0
+    book_updated_date: int = 0
+    book_download_date: int = 0
+    book_description: str = ''
+    book_genre: str = ''
+    book_series: str = 'field(default='')'
+    book_tags: tuple[str, ...] = field(default_factory=tuple)
+    book_series_order_position: int = 0
+    book_votes_count: int = 0
     book_status: Literal['In progress', 'Concluded', 'Frozen'] = field(repr=False, init=False)
-    book_monitoring_status: bool = field(default=False)
+    book_monitoring_status: bool = False

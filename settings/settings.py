@@ -66,5 +66,10 @@ LOGGING_CONFIG = {
             'level': 'DEBUG',
             'propagate': False
         },
+        'epub.epub': {
+            'handlers': ['console_handler', 'file_handler'],
+            'level': 'DEBUG',
+            'propagate': False
+        },
     }
 }

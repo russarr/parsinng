@@ -315,7 +315,6 @@ class BookDBRead(BookDBCommon, BookInfo):
             book_data = zip(boods_column_list, book_details, strict=True)
             for item in book_data:
                 self.__setattr__(item[0], item[1])
-        print(self)
 
     def _fetch_book_tags(self, cur: sq.Cursor, book_link: str) -> None:
         try:

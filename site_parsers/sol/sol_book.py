@@ -14,11 +14,12 @@ import logging
 from requests import Session
 from common.utils import raise_exception, create_soup
 from db_modules.db_common import BookDB
+from epub.epub import BookEpub  # type: ignore
 
 logger = logging.getLogger(__name__)
 
 
-class SolBook(SolRequestsSoup, BookDB):
+class SolBook(SolRequestsSoup, BookDB, BookEpub):
     __slots__ = ("book_link",
                  "site_name",
                  "book_title",
@@ -54,6 +55,7 @@ class SolBook(SolRequestsSoup, BookDB):
         for chapter in self.chapters_links:
             self._download_sol_chapter(chapter, session)
             time.sleep(random.randint(1, 3))
+        session.close()
         self.add_book_to_db()
 
     def _get_sol_book_info(self, session: Session) -> None:
@@ -221,7 +223,7 @@ class SolBook(SolRequestsSoup, BookDB):
         cover_link = book_soup.find('p', class_='c').find('img')  # type: ignore
         if cover_link:
             cover_link = cover_link.get('src')  # type: ignore
-            image_response = request_get_image(cover_link)
+            image_response = request_get_image(cover_link)  # type: ignore
             if image_response.status_code == 200:
                 image = image_response.content
                 book_cover_path = self.book_directory.joinpath('Images/_cover.jpg')
@@ -334,8 +336,8 @@ class SolBook(SolRequestsSoup, BookDB):
         book_status_search = re.search(r'<b>Posted:</b>\D*\d{4}-\d{2}-\d{2}(\D*)<b>Updated:</b>', book_details)
         book_status_html = book_status_search.group(1) if book_status_search else '<p></p>'
         book_status_raw = create_soup(book_status_html).find()
-        book_status_raw = book_status_raw.get_text().strip()
-        if 'Incomplete' in book_status_raw:
+        book_status_raw = book_status_raw.get_text().strip()  # type: ignore
+        if 'Incomplete' in book_status_raw:  # type: ignore
             self.book_status = 'Frozen'
         if re.search('<b>Concluded:</b>', book_details):
             self.book_status = 'Concluded'

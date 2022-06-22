@@ -8,3 +8,7 @@ class DataBaseExceptions(Exception):
 
 class ParsingException(Exception):
     """Ошибка парсинга книги"""
+
+
+class CompileException(Exception):
+    """Ошибка компиляции книги в файл"""
