@@ -287,13 +287,13 @@ class BookDBWrite(BookDBCommon, BookInfo):
 
 
 class BookDBRead(BookDBCommon, BookInfo):
-    def get_book_info_from_db(self, book_link: str) -> None:
+    def read_book_info_from_db(self) -> None:
         db_path = self.check_db_file()
         with sq.connect(db_path) as books_db:
             cur = books_db.cursor()
-            self._fetch_book_details(cur, book_link)
-            self._fetch_book_tags(cur, book_link)
-            self._fetch_chapters_info_list(cur, book_link)
+            self._fetch_book_details(cur, self.book_link)
+            self._fetch_book_tags(cur, self.book_link)
+            self._fetch_chapters_info_list(cur, self.book_link)
 
     def _fetch_book_details(self, cur: sq.Cursor, book_link: str) -> None:
         try:

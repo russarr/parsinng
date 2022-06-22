@@ -1,6 +1,8 @@
 import random
 import time
 
+import bs4
+
 from site_parsers.sol.sol_request_authorization import SolBookRequests  # type: ignore
 from common.common import BookInfo  # type: ignore
 from bs4 import BeautifulSoup, Tag, NavigableString
@@ -48,6 +50,7 @@ class SolRequestsSoup(SolBookRequests, BookInfo):
             if response.status_code == 200 and len(response.text) > 100:
                 logger.debug('Обошли второй шаг защиты')
                 chapter_soup_2 = create_soup('\n' + response.text.strip()).find()
+                assert isinstance(chapter_soup_2, bs4.PageElement)
                 tag = chapter_soup_1.find('div', id="sr")
                 if tag:
                     tag.replace_with(chapter_soup_2)

@@ -47,7 +47,7 @@ class SolBook(SolRequestsSoup, BookDB, BookEpub):
         super().__init__(book_link)
         self.site_name = 'https://storiesonline.net'
 
-    def download_full_book(self):
+    def download_full_sol_book(self):
         """Функция скачачивания книги полностью"""
         logger.debug('Начинаем скачивание книги')
         session = self.create_sol_requests_session()
@@ -58,7 +58,22 @@ class SolBook(SolRequestsSoup, BookDB, BookEpub):
         session.close()
         self.add_book_to_db()
 
+    def update_sol_book(self):
+        """Обновление storiesonline книги"""
+        logger.debug('Начинаем обновление книги')
+        session = self.create_sol_requests_session()
+        self.read_book_info_from_db()
+        sorted_chapters_list_in_db = self._get_sorted_chapters()
+        self._get_sol_book_info(session)
+        for chapter in self.chapters_links:
+            if chapter.chapter_link not in sorted_chapters_list_in_db[:-1]:
+                self._download_sol_chapter(chapter, session)
+                time.sleep(random.randint(1, 3))
+        self.update_book_in_db()
+        self.compile_epub_file()
+
     def _get_sol_book_info(self, session: Session) -> None:
+        """получения инфы о книги с stories_online"""
         logger.debug('Получаем информацию о книге')
         book_soup = self.get_book_soup(session)
         self._get_author_title(book_soup)
@@ -76,7 +91,8 @@ class SolBook(SolRequestsSoup, BookDB, BookEpub):
                                        book_link=self.book_link)
             chapter_soup = self.get_chapter_soup(chapter_info.chapter_link, session)
             chapter_info = self._get_chapter_info(chapter_soup, chapter_info)
-            self.chapters_info_list.append(chapter_info)
+            if chapter_info not in self.chapters_info_list:
+                self.chapters_info_list.append(chapter_info)
         else:
             error_message = f'Нет ссылки и имени главы'
             logger.error(error_message)
@@ -360,6 +376,11 @@ class SolBook(SolRequestsSoup, BookDB, BookEpub):
         else:
             logger.error(f'Проблема с получением book_id: отсутствует {self.book_link}')
             raise ParsingException(f'Проблема с получением book_id: отсутствует {self.book_link}')
+
+    def _get_sorted_chapters(self):
+        chapters_link_in_db = sorted([(link.chapter_link, link.chapter_file_name) for link in self.chapters_info_list], key=lambda x: x[1])
+        chapters_link_list_in_db = [link[0] for link in chapters_link_in_db]
+        return chapters_link_list_in_db
 
 
 def _print_book_info(book_info: BookInfo) -> None:

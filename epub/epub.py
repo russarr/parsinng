@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 class BookEpub(BookInfo):
 
     def compile_epub_file(self) -> None:
+        """Компилируем и сохраняем книгу в epub"""
         logger.debug('Компилируем epub-файл')
         file_name = self._create_file_name()
         save_path = Path('C:\\Users\\Necros\\YandexDisk\\books')
