@@ -143,8 +143,7 @@ class SfSbBook(BookDB, BookEpub):
         if isinstance(info_block, bs4.Tag):
             info_block = info_block.find('a')
             if isinstance(info_block, bs4.Tag):
-                chapter_link = info_block.get('href')
-                assert isinstance(chapter_link, str)
+                chapter_link = str(info_block.get('href'))
                 chapter_name = info_block.get_text().strip()
                 return chapter_link, chapter_name
             else:
