@@ -76,5 +76,10 @@ LOGGING_CONFIG = {
             'level': 'DEBUG',
             'propagate': False
         },
+        'site_parsers.sfsb.sf_sb_book': {
+            'handlers': ['console_handler', 'file_handler'],
+            'level': 'DEBUG',
+            'propagate': False
+        },
     }
 }

@@ -1,28 +1,18 @@
-import time
-
-from requests import Session
-import fake_useragent  # type: ignore
-import pickle
-from bs4 import BeautifulSoup
 import dotenv
-from os import getenv
-from common.exceptions import GetPageSourseException  # type: ignore
 import logging
+import pickle
+import time
+from bs4 import BeautifulSoup
+from common.exceptions import GetPageSourseException
+from common.utils import create_request_session
+from requests import Session
+from os import getenv
 
 logger = logging.getLogger(__name__)
 
 
 def create_sol_requests_session() -> Session:
-    logger.debug('Создаем сессию')
-    user = fake_useragent.UserAgent().random
-    header = {'user-agent': user,
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-              'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-              'DNT': '1',
-              'Upgrade-Insecure-Requests': '1'
-              }
-    session = Session()
-    session.headers.update(header)
+    session = create_request_session()
     session = _sol_authorsation(session)
     return session
 

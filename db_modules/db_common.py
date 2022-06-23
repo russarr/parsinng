@@ -1,10 +1,9 @@
-from pathlib import Path
-from common.exceptions import DataBaseExceptions  # type: ignore
 import logging
 from datetime import datetime
+from common.common import BookInfo, ChapterInfo
+from common.exceptions import DataBaseExceptions
+from pathlib import Path
 import sqlite3 as sq
-from common.common import BookInfo, ChapterInfo  # type: ignore
-from common.utils import raise_exception  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +24,7 @@ type_tag_table_add = tuple[tuple[str, str], ...]
 type_data_add = tuple[type_book_table_add, type_author_table_add, type_chapters_table_add, type_tag_table_add]
 type_book_table_upd = tuple[str, str, str, int, int, int, float, str, int, int, str, str]
 type_data_upd = tuple[type_book_table_upd, type_chapters_table_add, type_tag_table_add]
+
 
 def create_db() -> None:
     logger.debug('создаем БД')
@@ -225,7 +225,9 @@ class BookDBWrite(BookInfo):
                 site_name,
                 book_directory) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data_book)
         except sq.Error as e:
-            raise_exception(DataBaseExceptions, f'Проблемы с записью в таблицу books: {data_book}. {e}')
+            error_message = f'Проблемы с записью в таблицу books: {data_book}. {e}'
+            logger.error(error_message)
+            raise DataBaseExceptions(error_message)
 
     def _write_data_author_table_to_add(self, cur: sq.Cursor, data_author: type_author_table_add) -> None:
         if not self._check_if_author_exist_in_db(cur):
@@ -261,7 +263,9 @@ class BookDBWrite(BookInfo):
                 book_link
                 ) VALUES(?,?,?,?,?,?)""", data_chapters)
         except sq.Error as e:
-            raise_exception(DataBaseExceptions, f'Проблемы с записью в таблицу chapters {data_chapters}. {e}')
+            error_message = f'Проблемы с записью в таблицу chapters {data_chapters}. {e}'
+            logger.error(error_message)
+            raise DataBaseExceptions(error_message)
 
     @staticmethod
     def _write_data_tags_table_to_add(cur: sq.Cursor, data_tags: type_tag_table_add) -> None:
@@ -271,7 +275,9 @@ class BookDBWrite(BookInfo):
                 book_link
                 ) VALUES(?,?)""", data_tags)
         except sq.Error as e:
-            raise_exception(DataBaseExceptions, f'Проблемы с записью в таблицу tags {data_tags} {e}')
+            error_message = f'Проблемы с записью в таблицу tags {data_tags} {e}'
+            logger.error(error_message)
+            raise DataBaseExceptions(error_message)
 
     def _form_data_to_upd(self) -> type_data_upd:
         data_book = self._form_data_book_table_to_upd()
@@ -323,7 +329,9 @@ class BookDBWrite(BookInfo):
                 book_status=?
                 WHERE book_link=? """, data_books)
         except sq.Error as e:
-            raise_exception(DataBaseExceptions, f'Проблемы обновления таблицы boosk{data_books}. {e}')
+            error_message = f'Проблемы обновления таблицы boosk{data_books}. {e}'
+            logger.error(error_message)
+            raise DataBaseExceptions(error_message)
 
 
 class BookDBRead(BookInfo):

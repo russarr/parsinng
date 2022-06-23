@@ -1,21 +1,21 @@
-import random
-import time
 import bs4
+import logging
+import random
+import re
+import time
 from bs4 import BeautifulSoup
-from common.common import ChapterLinkName, ChapterInfo
 from pathlib import Path
 from datetime import datetime
-from common.exceptions import ParsingException, GetPageSourseException
-from common.utils import request_get_image
-import re
-from common.common import BookInfo
-from site_parsers.sol.sol_requests_soup import SolRequestsSoup
-from site_parsers.sol.sol_request_authorization import create_sol_requests_session
-import logging
-from requests import Session
-from common.utils import create_soup
 from db_modules.db_common import BookDB, check_book_link_in_db
 from epub.epub import BookEpub
+from common.exceptions import ParsingException, GetPageSourseException
+from common.common import ChapterLinkName, ChapterInfo
+from common.common import BookInfo
+from common.utils import request_get_image
+from common.utils import create_soup
+from requests import Session
+from site_parsers.sol.sol_request_authorization import create_sol_requests_session
+from site_parsers.sol.sol_requests_soup import SolRequestsSoup
 
 logger = logging.getLogger(__name__)
 
