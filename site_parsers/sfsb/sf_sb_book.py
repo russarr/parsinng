@@ -3,7 +3,7 @@ from typing import Literal
 
 import bs4
 
-from common.utils import create_request_session, create_soup
+from common.utils import create_soup
 from db_modules.db_common import BookDB
 from epub.epub import BookEpub
 from bs4 import BeautifulSoup
@@ -11,7 +11,7 @@ from requests import Session
 from requests.exceptions import JSONDecodeError
 from common.exceptions import GetPageSourseException, ParsingException
 import logging
-from common.common import ChapterInfo
+from common.project_types import ChapterInfo
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +38,13 @@ class SfSbBook(BookDB, BookEpub):
         self.site_name = site_name
         self.book_link = book_link
 
-    def _get_sf_sb_soup(self) -> None:
+    def _get_book_info(self) -> None:
+        # session = create_request_session()
+        # book_soup = self._get_sf_sb_soup(session)
+        pass
+
+    def _get_sf_sb_soup(self, session: Session) -> None:
         logger.debug('Получаем page sourse основной страницы')
-        session = create_request_session()
         response = session.get(self.site_name + self.book_link)
         page_soup = create_soup(response.text)
         page_soup = self._open_hidden_chapters(page_soup, session)

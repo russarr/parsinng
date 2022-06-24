@@ -1,26 +1,22 @@
 import bs4
 import logging
-import random
 import re
-import time
 from bs4 import BeautifulSoup
 from pathlib import Path
 from datetime import datetime
-from db_modules.db_common import BookDB, check_book_link_in_db
-from epub.epub import BookEpub
 from common.exceptions import ParsingException, GetPageSourseException
-from common.common import ChapterLinkName, ChapterInfo
-from common.common import BookInfo
+from common.project_types import ChapterLinkName, ChapterInfo
+from common.common import Book
 from common.utils import request_get_image
 from common.utils import create_soup
 from requests import Session
-from site_parsers.sol.sol_request_authorization import create_sol_requests_session
+from site_parsers.sol.sol_request_authorization import create_sol_auth_session
 from site_parsers.sol.sol_requests_soup import SolRequestsSoup
 
 logger = logging.getLogger(__name__)
 
 
-class SolBook(SolRequestsSoup, BookDB, BookEpub):
+class SolBook(SolRequestsSoup, Book):
     __slots__ = ("book_link",
                  "site_name",
                  "book_title",
@@ -48,41 +44,14 @@ class SolBook(SolRequestsSoup, BookDB, BookEpub):
         super().__init__(book_link)
         self.site_name = 'https://storiesonline.net'
 
-    def downoload_sol_book(self, session: Session, redownload: bool = False) -> None:
-        if check_book_link_in_db(self.book_link) and not redownload:
-            self._update_sol_book(session)
-        else:
-            self._download_full_sol_book(session)
 
-    def _download_full_sol_book(self, session: Session | None = None) -> None:
-        """Функция скачачивания книги полностью"""
-        logger.debug(f'Начинаем скачивание книги {self.book_link}')
-        if session is None:
-            session = create_sol_requests_session()
-        self._get_sol_book_info(session)
-        for chapter in self.chapters_links:
-            self._download_sol_chapter(chapter, session)
-            time.sleep(random.randint(1, 3))
-        session.close()
-        self.add_book_to_db()
-        self.compile_epub_file()
+    @staticmethod
+    def _create_auth_session() -> Session:
+        logger.debug('Создаем сессию')
+        session = create_sol_auth_session()
+        return session
 
-    def _update_sol_book(self, session: Session | None = None) -> None:
-        """Обновление storiesonline книги"""
-        logger.debug('Начинаем обновление книги')
-        if session is None:
-            session = create_sol_requests_session()
-        self.read_book_info_from_db()
-        sorted_chapters_list_in_db = self._get_sorted_chapters()
-        self._get_sol_book_info(session)
-        for chapter in self.chapters_links:
-            if chapter.chapter_link not in sorted_chapters_list_in_db[:-1]:
-                self._download_sol_chapter(chapter, session)
-                time.sleep(random.randint(1, 3))
-        self.update_book_in_db()
-        self.compile_epub_file()
-
-    def _get_sol_book_info(self, session: Session) -> None:
+    def _get_book_info(self, session: Session) -> None:
         """получения инфы о книги с stories_online"""
         logger.debug('Получаем информацию о книге')
         book_soup = self.get_book_soup(session)
@@ -92,7 +61,7 @@ class SolBook(SolRequestsSoup, BookDB, BookEpub):
         self._get_book_cover(book_soup)
         self._get_book_details(session)
 
-    def _download_sol_chapter(self, chapter_link_name: ChapterLinkName, session: Session) -> None:
+    def _download_chapter(self, chapter_link_name: ChapterLinkName, session: Session) -> None:
         logger.debug(f'Скачиваем главу: {chapter_link_name}')
         if chapter_link_name:
             chapter_info = ChapterInfo(chapter_link=chapter_link_name.chapter_link,
@@ -238,20 +207,7 @@ class SolBook(SolRequestsSoup, BookDB, BookEpub):
             logger.error('Не умею загружать короткие истории без списка глав')
             raise ParsingException('Не умею загружать короткие истории без списка глав')
 
-    def _create_book_directories(self) -> None:
-        logger.debug('создаем директории на диске')
-        book_directory = ['book_database'] + self.author_link.split('/')[-1:] + self.book_link.split('/')[-1:]
-        book_path = Path(*book_directory)
-        book_images_path = book_path.joinpath('Images')
-        book_texts_path = book_path.joinpath('Text')
-        try:
-            book_images_path.mkdir(parents=True, exist_ok=True)
-            book_texts_path.mkdir(parents=True, exist_ok=True)
-        except PermissionError as e:
-            logger.exception(f'Ошибка создания папки на диске')
-            raise ParsingException(f'Ошибка создания папки на диске {e}')
-        self.book_directory = book_path
-        logger.debug(f'{self.book_directory=}')
+
 
     def _get_book_cover(self, book_soup: BeautifulSoup) -> None:
         logger.debug('сохраянем обложку книги')
@@ -397,13 +353,3 @@ class SolBook(SolRequestsSoup, BookDB, BookEpub):
         else:
             logger.error(f'Проблема с получением book_id: отсутствует {self.book_link}')
             raise ParsingException(f'Проблема с получением book_id: отсутствует {self.book_link}')
-
-    def _get_sorted_chapters(self) -> list[str]:
-        chapters_link_in_db = sorted([(link.chapter_link, link.chapter_file_name) for link in self.chapters_info_list], key=lambda x: x[1])
-        chapters_link_list_in_db = [link[0] for link in chapters_link_in_db]
-        return chapters_link_list_in_db
-
-
-def _print_book_info(book_info: BookInfo) -> None:
-    for line in book_info.__dict__:
-        print(line, book_info.__getattribute__(line))

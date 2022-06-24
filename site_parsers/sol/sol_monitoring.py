@@ -1,6 +1,6 @@
 import time
 
-from site_parsers.sol.sol_request_authorization import create_sol_requests_session
+from site_parsers.sol.sol_request_authorization import create_sol_auth_session
 from requests import Session
 from bs4 import BeautifulSoup
 from common.exceptions import GetPageSourseException, ParsingException
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def check_sol_updates() -> None:
     logger.debug('Проверяемя страницу обновлений и страницу новых историй')
-    session = create_sol_requests_session()
+    session = create_sol_auth_session()
     _check_sol_updates_page(session)
     _check_sol_new_story_page(session)
 
@@ -27,7 +27,7 @@ def _check_sol_updates_page(session: Session) -> None:
     upd_stories_list = _get_upd_stories_download_list(page_soup)
     for book_link in upd_stories_list:
         book = SolBook(book_link)
-        book.downoload_sol_book(session)
+        book.downoload_book(session)
         time.sleep(3)
 
 
@@ -36,7 +36,7 @@ def _check_sol_new_story_page(session: Session) -> None:
     new_stories_list = get_new_stories_download_list(page_soup)
     for book_link in new_stories_list:
         book = SolBook(book_link)
-        book.downoload_sol_book(session)
+        book.downoload_book(session)
         time.sleep(3)
 
 

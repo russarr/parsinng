@@ -3,7 +3,7 @@ import time
 
 import bs4
 
-from common.common import BookInfo  # type: ignore
+from common.project_types import BookInfo  # type: ignore
 from bs4 import BeautifulSoup, Tag, NavigableString
 from requests import Session
 import logging

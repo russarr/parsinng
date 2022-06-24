@@ -11,7 +11,8 @@ from os import getenv
 logger = logging.getLogger(__name__)
 
 
-def create_sol_requests_session() -> Session:
+def create_sol_auth_session() -> Session:
+    logger.debug('Авторизуемся на sol')
     session = create_request_session()
     session = _sol_authorsation(session)
     return session

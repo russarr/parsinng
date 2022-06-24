@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from common.common import BookInfo, ChapterInfo
+from common.project_types import BookInfo, ChapterInfo
 from common.exceptions import DataBaseExceptions
 from pathlib import Path
 import sqlite3 as sq
@@ -22,7 +22,7 @@ type_author_table_add = tuple[str, str]
 type_chapters_table_add = tuple[tuple[str, str, str, int, int, str], ...]
 type_tag_table_add = tuple[tuple[str, str], ...]
 type_data_add = tuple[type_book_table_add, type_author_table_add, type_chapters_table_add, type_tag_table_add]
-type_book_table_upd = tuple[str, str, str, int, int, int, float, str, int, int, str, str]
+type_book_table_upd = tuple[str, str, str, int, int, int, float, str, int, int, str, str, str]
 type_data_upd = tuple[type_book_table_upd, type_chapters_table_add, type_tag_table_add]
 
 
@@ -130,12 +130,14 @@ def get_monitoring_authors_list() -> tuple[str, ...]:
 
 class BookDBWrite(BookInfo):
     def add_book_to_db(self) -> None:
+        """Фукнция добавляет информацию в БД(данные берет из экземпляра класса)"""
         logger.debug('Добавляем книгу в БД')
         db_path = check_db_file()
         data_to_add = self._form_data_add_db()
         self._write_data_to_add(data_to_add, db_path)
 
     def update_book_in_db(self) -> None:
+        """Фукнция обвновляет информацию в БД(данные берет из экземпляра класса)"""
         logger.debug('Обновляем книгу в БД')
         db_path = check_db_file()
         data_to_upd = self._form_data_to_upd()
@@ -230,7 +232,9 @@ class BookDBWrite(BookInfo):
             raise DataBaseExceptions(error_message)
 
     def _write_data_author_table_to_add(self, cur: sq.Cursor, data_author: type_author_table_add) -> None:
-        if not self._check_if_author_exist_in_db(cur):
+        logger.debug(f'записываем таблицу authors {data_author=}')
+        if self._check_if_author_exist_in_db(cur):
+            logger.debug(f'Автор уже в базе {self._check_if_author_exist_in_db(cur)}')
             return
         try:
             cur.execute("""INSERT OR REPLACE INTO authors (
@@ -244,7 +248,9 @@ class BookDBWrite(BookInfo):
     def _check_if_author_exist_in_db(self, cur: sq.Cursor) -> bool:
         """Функция проверяет, если автор уже есть в БД"""
         try:
+            logger.debug(f'проверяем наличие автора в БД {self.author_link}')
             cur.execute("""SELECT * FROM authors WHERE author_link=?""", (self.author_link,))
+            print(cur.fetchone())
             return True if cur.fetchone() else False
         except sq.Error as e:
             error_message = f'Проблемы при проверки наличия автора {self.author_link} в БД. {e}'
@@ -280,6 +286,7 @@ class BookDBWrite(BookInfo):
             raise DataBaseExceptions(error_message)
 
     def _form_data_to_upd(self) -> type_data_upd:
+        logger.debug('Формируем все данные для обновления книги в БД')
         data_book = self._form_data_book_table_to_upd()
         data_chapters = self._form_data_chapters_table_to_add()
         data_tags = self._form_data_tags_table_add_db()
@@ -299,7 +306,9 @@ class BookDBWrite(BookInfo):
             self.book_updated_date,
             self.book_download_date,
             self.book_status,
+            str(self.book_directory),
             self.book_link
+
         )
         return data_book
 
@@ -326,10 +335,11 @@ class BookDBWrite(BookInfo):
                 sex_content=?,
                 updated_date=?,
                 download_date=?,
-                book_status=?
+                book_status=?,
+                book_directory=?
                 WHERE book_link=? """, data_books)
         except sq.Error as e:
-            error_message = f'Проблемы обновления таблицы boosk{data_books}. {e}'
+            error_message = f'Проблемы обновления таблицы books{data_books}. {e}'
             logger.error(error_message)
             raise DataBaseExceptions(error_message)
 
@@ -350,19 +360,25 @@ class BookDBRead(BookInfo):
              JOIN authors ON books.author_link = authors.author_link
              WHERE book_link = ? """, (book_link,))
             book_details = cur.fetchone()
+            if not book_details:
+                raise sq.Error
         except sq.Error:
-            error_message = f'Ошбика получения информации из БД по ссылке:{book_link}'
+            error_message = f'Ошибика получения информации из БД по ссылке:{book_link}'
             logger.error(error_message)
             raise DataBaseExceptions(error_message)
 
-        boods_column_list = ('book_link', 'author_link', 'book_title', 'book_description', 'book_genre', 'book_series',
+        books_column_list = ('book_link', 'author_link', 'book_title', 'book_description', 'book_genre', 'book_series',
                              'book_series_order_position', 'book_size', 'book_votes_count', 'book_score', 'book_sex_content',
                              'book_posted_date', 'book_updated_date', 'book_download_date', 'book_status', 'book_monitoring_status',
                              'site_name', 'book_directory', 'author_name')
-        if len(book_details) == len(boods_column_list):
-            book_data = zip(boods_column_list, book_details, strict=True)
+        if len(book_details) == len(books_column_list):
+            book_data = zip(books_column_list, book_details, strict=True)
             for item in book_data:
                 self.__setattr__(item[0], item[1])
+        else:
+            error_message = f'Ошибка получения информации о книге из БД'
+            logger.error(error_message)
+            raise DataBaseExceptions(error_message)
 
     def _fetch_book_tags(self, cur: sq.Cursor, book_link: str) -> None:
         try:
@@ -394,6 +410,12 @@ class BookDBRead(BookInfo):
             error_message = f'Ошибка загрузки информации по главам книги:{book_link}'
             logger.error(error_message)
             raise DataBaseExceptions(error_message)
+
+    def _get_sorted_chapters(self) -> list[str]:
+        """Возвращает отсортированный список глав"""
+        chapters_link_in_db = sorted([(link.chapter_link, link.chapter_file_name) for link in self.chapters_info_list], key=lambda x: x[1])
+        chapters_link_list_in_db = [link[0] for link in chapters_link_in_db]
+        return chapters_link_list_in_db
 
 
 class BookDB(BookDBWrite, BookDBRead):

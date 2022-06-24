@@ -2,8 +2,9 @@ import zipfile
 from pathlib import Path
 from datetime import datetime
 from common.exceptions import CompileException
-from common.common import BookInfo
+from common.project_types import BookInfo
 import logging
+from common.utils import form_acceptable_name
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +42,10 @@ class BookEpub(BookInfo):
     def _create_file_name(self) -> str:
         logger.debug('Создаем имя книги')
         file_name = self.author_name + ' - ' + self.book_title
-        # убираем недопустимые символы из имени файла
-        for letter in file_name:
-            if not letter.isalnum() and letter not in ' -–_$#&@!%(){}¢`~^':
-                file_name = file_name.replace(letter, '~')
-            if len(file_name) > 75:
-                file_name = file_name[:74]
+        form_acceptable_name(file_name, file_name_length=75)
         return file_name + '.epub'
+
+
 
     def _create_content_and_toc_data(self) -> tuple[str, str]:
         xml_version = '<?xml version="1.0" encoding="utf-8"?>\n'

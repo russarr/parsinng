@@ -2,13 +2,16 @@ import fake_useragent
 import logging
 import requests
 from bs4 import BeautifulSoup
+from common.project_types import BookInfo
 from common.exceptions import GetPageSourseException
 from requests import Session
+
 
 logger = logging.getLogger(__name__)
 
 
 def parse_book_url(book_url: str) -> tuple[str, str]:
+    """возвращает site_name, book_link"""
     logger.debug(f'парсим url {book_url}')
     for site_name in ['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net']:
         if book_url.startswith(site_name):
@@ -18,8 +21,9 @@ def parse_book_url(book_url: str) -> tuple[str, str]:
             logger.debug(f'результат парсинга:{site_name=}, {book_link=}')
             return site_name, book_link
     else:
-        logger.error(f'{book_url} - wrong url')
-        raise GetPageSourseException(f'{book_url} - wrong url')
+        error_message = f'{book_url} - wrong url'
+        logger.error(error_message)
+        raise GetPageSourseException(error_message)
 
 
 def request_get_image(image_link: str) -> requests.Response:
@@ -46,3 +50,17 @@ def create_request_session() -> Session:
     session = Session()
     session.headers.update(header)
     return session
+
+def print_book_info(book_info: BookInfo) -> None:
+    for line in book_info.__dict__:
+        print(line, book_info.__getattribute__(line))
+
+
+def form_acceptable_name(file_name: str, file_name_length: int) -> str:
+    """Функция убирает недопустимые символы из имени файла"""
+    for letter in file_name:
+        if not letter.isalnum() and letter not in ' -–_$#&@!%(){}¢`~^':
+            file_name = file_name.replace(letter, '~')
+    if len(file_name) > file_name_length:
+        file_name = file_name[:file_name_length]
+    return file_name.strip()
