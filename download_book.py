@@ -8,7 +8,7 @@ import logging
 from settings.settings import LOGGING_CONFIG
 
 logging.config.dictConfig(LOGGING_CONFIG)
-logger = logging.getLogger('logger')
+logger = logging.getLogger(__name__)
 
 def main() -> None:
     logger.debug('Начинаем загрузку книги')

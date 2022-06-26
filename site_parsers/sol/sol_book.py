@@ -2,7 +2,6 @@ import bs4
 import logging
 import re
 from bs4 import BeautifulSoup
-from pathlib import Path
 from datetime import datetime
 from common.exceptions import ParsingException, GetPageSourseException
 from common.project_types import ChapterLinkName, ChapterInfo
@@ -44,7 +43,6 @@ class SolBook(SolRequestsSoup, Book):
         super().__init__(book_link)
         self.site_name = 'https://storiesonline.net'
 
-
     @staticmethod
     def _create_auth_session() -> Session:
         logger.debug('Создаем сессию')
@@ -69,7 +67,7 @@ class SolBook(SolRequestsSoup, Book):
                                        chapter_file_name=f'chapter_{str(chapter_link_name.chapter_order_position).zfill(4)}.html',
                                        book_link=self.book_link)
             chapter_soup = self.get_chapter_soup(chapter_info.chapter_link, session)
-            chapter_info = self._get_chapter_info(chapter_soup, chapter_info)
+            chapter_info = self._get_chapter(chapter_soup, chapter_info)
             if chapter_info not in self.chapters_info_list:
                 self.chapters_info_list.append(chapter_info)
         else:
@@ -77,7 +75,7 @@ class SolBook(SolRequestsSoup, Book):
             logger.error(error_message)
             raise ParsingException(error_message)
 
-    def _get_chapter_info(self, chapter_soup: BeautifulSoup, chapter_info: ChapterInfo) -> ChapterInfo:
+    def _get_chapter(self, chapter_soup: BeautifulSoup, chapter_info: ChapterInfo) -> ChapterInfo:
         logger.debug('Парсим текст главы')
         chapter_soup = create_soup(str(chapter_soup.find('article')))
         if chapter_soup:
@@ -85,7 +83,7 @@ class SolBook(SolRequestsSoup, Book):
             chapter_soup = self._clear_chapter_soup(chapter_soup)
             chapter_soup = self._get_chapter_images(chapter_soup)
             chapter_text = self._get_chapter_text(chapter_soup)
-            self._save_chapter_text_on_disk(chapter_text, chapter_file_name=chapter_info.chapter_file_name, book_directory=self.book_directory)
+            self._save_chapter_text_on_disk(chapter_text, chapter_info)
         else:
             error_message = 'Не могу найти тэг article'
             logger.error(error_message)
@@ -123,36 +121,6 @@ class SolBook(SolRequestsSoup, Book):
                 tag_to_delete.decompose()
         return chapter_soup
 
-    def _get_chapter_images(self, soup: BeautifulSoup) -> BeautifulSoup:
-        """функция получения картинок в главе"""
-        logger.debug('сохраняем изображения из текста')
-        images = soup.findAll('img')
-        for image in images:
-            image_link = image.get('src')
-            local_image_path = self._save_image(image_link, self.book_directory)
-            if local_image_path:
-                image['src'] = '../' + local_image_path  # добавлил ../ вначале адреса тэга, чтобы работатла в .epub книгах
-        return soup
-
-    @staticmethod
-    def _save_image(image_link: str, book_path: Path) -> str:
-        image_name = 'Images/' + image_link.split('/')[-1]
-        image_path = book_path.joinpath(image_name)
-        if image_path.exists():
-            return image_name
-        else:
-            image_response = request_get_image(image_link)
-            if image_response.status_code == 200:
-                image = image_response.content
-                image_path.write_bytes(image)
-                return image_name
-            elif image_response.status_code == 404:
-                return image_name
-            else:
-                error_message = f'Ошибка {image_response.status_code} загрузки изображения {image_name} в тексте главы'
-                logger.error(error_message)
-                raise ParsingException(error_message)
-
     def _get_chapter_text(self, soup: BeautifulSoup) -> str:
         logger.debug('Получаем финальный текст главы')
         chapter_text = str(soup).strip()
@@ -167,18 +135,6 @@ class SolBook(SolRequestsSoup, Book):
         for symbol in '“”':
             chapter_text = chapter_text.replace(symbol, '"')
         return chapter_text
-
-    @staticmethod
-    def _save_chapter_text_on_disk(chapter_text: str, chapter_file_name: str, book_directory: Path) -> Path:
-        logger.debug('Сохраняем текст главы на диск')
-        chapter_path = book_directory.joinpath(f'Text/{chapter_file_name}')
-        try:
-            chapter_path.write_text(chapter_text, encoding='utf-8')
-        except PermissionError:
-            error_message = f'Не могу сохранить на диск {chapter_path=}'
-            logger.error(error_message)
-            raise ParsingException(error_message)
-        return chapter_path
 
     def _get_author_title(self, book_soup: BeautifulSoup) -> None:
         logger.debug(f'Получаем название и имя автор {self.book_link}')
@@ -206,8 +162,6 @@ class SolBook(SolRequestsSoup, Book):
         else:
             logger.error('Не умею загружать короткие истории без списка глав')
             raise ParsingException('Не умею загружать короткие истории без списка глав')
-
-
 
     def _get_book_cover(self, book_soup: BeautifulSoup) -> None:
         logger.debug('сохраянем обложку книги')

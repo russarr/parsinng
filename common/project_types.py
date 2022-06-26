@@ -7,10 +7,10 @@ from typing import Literal, NamedTuple
 logger = logging.getLogger('logger')
 
 
-class ChapterLinkName(NamedTuple):
-    chapter_link: str
-    chapter_name: str
-    chapter_order_position: int
+# class ChapterLinkName(NamedTuple):
+#     chapter_link: str
+#     chapter_name: str
+#     chapter_order_position: int
 
 
 @dataclass

@@ -3,12 +3,12 @@ import time
 
 import bs4
 
-from common.project_types import BookInfo  # type: ignore
+from common.project_types import BookInfo
 from bs4 import BeautifulSoup, Tag, NavigableString
 from requests import Session
 import logging
-from common.utils import create_soup  # type: ignore
-from common.exceptions import ParsingException  # type: ignore
+from common.utils import create_soup
+from common.exceptions import ParsingException
 
 logger = logging.getLogger(__name__)
 

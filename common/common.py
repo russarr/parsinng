@@ -1,12 +1,13 @@
+from bs4 import BeautifulSoup
 from db_modules.db_common import BookDB
 from epub.epub import BookEpub
 from requests import Session
 from db_modules.db_common import check_book_link_in_db
-from common.project_types import ChapterLinkName
+from common.project_types import ChapterInfo # ChapterLinkName
 from common.utils import create_request_session
 from pathlib import Path
 from common.exceptions import ParsingException
-from common.utils import form_acceptable_name
+from common.utils import form_acceptable_name, request_get_image
 
 import logging
 import time
@@ -75,3 +76,45 @@ class Book(BookDB, BookEpub):
             raise ParsingException(f'Ошибка создания папки на диске {e}')
         self.book_directory = book_path
         logger.debug(f'{self.book_directory=}')
+
+    def _save_chapter_text_on_disk(self, chapter_text: str, chapter_info: ChapterInfo) -> Path:
+        logger.debug('Сохраняем текст главы на диск')
+        book_directory = Path(self.book_directory)
+        chapter_path = book_directory.joinpath(f'Text/{chapter_info.chapter_file_name}')
+        try:
+            chapter_path.write_text(chapter_text, encoding='utf-8')
+        except PermissionError:
+            error_message = f'Не могу сохранить на диск {chapter_path=}'
+            logger.error(error_message)
+            raise ParsingException(error_message)
+        return chapter_path
+
+    @staticmethod
+    def _save_image(image_link: str, book_path: Path) -> str:
+        image_name = 'Images/' + image_link.split('/')[-1]
+        image_path = book_path.joinpath(image_name)
+        if image_path.exists():
+            return image_name
+        else:
+            image_response = request_get_image(image_link)
+            if image_response.status_code == 200:
+                image = image_response.content
+                image_path.write_bytes(image)
+                return image_name
+            elif image_response.status_code == 404:
+                return image_name
+            else:
+                error_message = f'Ошибка {image_response.status_code} загрузки изображения {image_name} в тексте главы'
+                logger.error(error_message)
+                raise ParsingException(error_message)
+
+    def _get_chapter_images(self, soup: BeautifulSoup) -> BeautifulSoup:
+        """функция получения картинок в главе"""
+        logger.debug('сохраняем изображения из текста')
+        images = soup.findAll('img')
+        for image in images:
+            image_link = image.get('src')
+            local_image_path = self._save_image(image_link, self.book_directory)
+            if local_image_path:
+                image['src'] = '../' + local_image_path  # добавлил ../ вначале адреса тэга, чтобы работало в .epub книгах
+        return soup
