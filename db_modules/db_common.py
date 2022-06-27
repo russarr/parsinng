@@ -19,7 +19,7 @@ def check_db_file() -> Path:
 
 type_book_table_add = tuple[str, str, str, str, str, str, int, int, int, float, str, int, int, int, str, int, str, str]
 type_author_table_add = tuple[str, str]
-type_chapters_table_add = tuple[tuple[str, str, str, int, int, str], ...]
+type_chapters_table_add = tuple[tuple[str, str, str, int, int, str, int], ...]
 type_tag_table_add = tuple[tuple[str, str], ...]
 type_data_add = tuple[type_book_table_add, type_author_table_add, type_chapters_table_add, type_tag_table_add]
 type_book_table_upd = tuple[str, str, str, int, int, int, float, str, int, int, str, str, str]
@@ -76,6 +76,7 @@ def create_db() -> None:
             chapter_posted_date INTEGER NULL DEFAULT 0,
             chapter_updated_date INTEGER NULL DEFAULT 0,
             book_link TEXT(100) NOT NULL,
+            chapter_size INTEGER NULL DEFAULT 0,
             FOREIGN KEY (book_link) REFERENCES books(book_link)
             ON DELETE CASCADE
             ON UPDATE CASCADE
@@ -188,7 +189,8 @@ class BookDBWrite(BookInfo):
                                chapter.chapter_file_name,
                                chapter.chapter_posted_date,
                                chapter.chapter_updated_date,
-                               chapter.book_link) for chapter in self.chapters_info_list)
+                               chapter.book_link,
+                               chapter.chapter_size) for chapter in self.chapters_info_list)
         return data_chapters
 
     def _form_data_tags_table_add_db(self) -> type_tag_table_add:
@@ -226,9 +228,9 @@ class BookDBWrite(BookInfo):
                 book_monitor_status,
                 site_name,
                 book_directory) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data_book)
-        except sq.Error as e:
-            error_message = f'Проблемы с записью в таблицу books: {data_book}. {e}'
-            logger.error(error_message)
+        except sq.Error:
+            error_message = f'Проблемы с записью в таблицу books: {data_book}'
+            logger.exception(error_message)
             raise DataBaseExceptions(error_message)
 
     def _write_data_author_table_to_add(self, cur: sq.Cursor, data_author: type_author_table_add) -> None:
@@ -240,9 +242,9 @@ class BookDBWrite(BookInfo):
             cur.execute("""INSERT OR REPLACE INTO authors (
                 author_link,
                 author_name) VALUES (?,?)""", data_author)
-        except sq.Error as e:
-            error_message = f'Проблемы с записью в таблицу authors {data_author}. {e}'
-            logger.error(error_message)
+        except sq.Error:
+            error_message = f'Проблемы с записью в таблицу authors {data_author}'
+            logger.exception(error_message)
             raise DataBaseExceptions(error_message)
 
     def _check_if_author_exist_in_db(self, cur: sq.Cursor) -> bool:
@@ -251,9 +253,9 @@ class BookDBWrite(BookInfo):
             logger.debug(f'проверяем наличие автора в БД {self.author_link}')
             cur.execute("""SELECT * FROM authors WHERE author_link=?""", (self.author_link,))
             return True if cur.fetchone() else False
-        except sq.Error as e:
-            error_message = f'Проблемы при проверки наличия автора {self.author_link} в БД. {e}'
-            logger.error(error_message)
+        except sq.Error:
+            error_message = f'Проблемы при проверки наличия автора {self.author_link} в БД'
+            logger.exception(error_message)
             raise DataBaseExceptions(error_message)
 
     @staticmethod
@@ -265,11 +267,12 @@ class BookDBWrite(BookInfo):
                 chapter_file_name,
                 chapter_posted_date,
                 chapter_updated_date,
-                book_link
-                ) VALUES(?,?,?,?,?,?)""", data_chapters)
-        except sq.Error as e:
-            error_message = f'Проблемы с записью в таблицу chapters {data_chapters}. {e}'
-            logger.error(error_message)
+                book_link,
+                chapter_size
+                ) VALUES(?,?,?,?,?,?,?)""", data_chapters)
+        except sq.Error:
+            error_message = f'Проблемы с записью в таблицу chapters {data_chapters}'
+            logger.exception(error_message)
             raise DataBaseExceptions(error_message)
 
     @staticmethod
@@ -279,9 +282,9 @@ class BookDBWrite(BookInfo):
                 tag,
                 book_link
                 ) VALUES(?,?)""", data_tags)
-        except sq.Error as e:
-            error_message = f'Проблемы с записью в таблицу tags {data_tags} {e}'
-            logger.error(error_message)
+        except sq.Error:
+            error_message = f'Проблемы с записью в таблицу tags {data_tags}'
+            logger.exception(error_message)
             raise DataBaseExceptions(error_message)
 
     def _form_data_to_upd(self) -> type_data_upd:
@@ -337,9 +340,9 @@ class BookDBWrite(BookInfo):
                 book_status=?,
                 book_directory=?
                 WHERE book_link=? """, data_books)
-        except sq.Error as e:
-            error_message = f'Проблемы обновления таблицы books{data_books}. {e}'
-            logger.error(error_message)
+        except sq.Error:
+            error_message = f'Проблемы обновления таблицы books{data_books}.'
+            logger.exception(error_message)
             raise DataBaseExceptions(error_message)
 
 
@@ -363,7 +366,7 @@ class BookDBRead(BookInfo):
                 raise sq.Error
         except sq.Error:
             error_message = f'Ошибика получения информации из БД по ссылке:{book_link}'
-            logger.error(error_message)
+            logger.exception(error_message)
             raise DataBaseExceptions(error_message)
 
         books_column_list = ('book_link', 'author_link', 'book_title', 'book_description', 'book_genre', 'book_series',
@@ -384,7 +387,7 @@ class BookDBRead(BookInfo):
             cur.execute("""SELECT tag FROM book_tags WHERE book_link = ?""", (book_link,))
         except sq.Error:
             error_message = f'Ошбика получения информации о тэгах из БД по ссылке:{book_link}'
-            logger.error(error_message)
+            logger.exception(error_message)
             raise DataBaseExceptions(error_message)
 
         book_tags = cur.fetchall()
@@ -396,7 +399,7 @@ class BookDBRead(BookInfo):
             cur.execute("""SELECT chapter_name, chapter_file_name, chapter_link, chapter_posted_date, chapter_updated_date, book_link FROM chapters WHERE book_link = ?""", (book_link,))
         except sq.Error:
             error_message = f'Ошбика получения информации о глвах из БД по ссылке:{book_link}'
-            logger.error(error_message)
+            logger.exception(error_message)
             raise DataBaseExceptions(error_message)
         chapters_info_list = cur.fetchall()
 
