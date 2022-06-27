@@ -224,7 +224,7 @@ class SfSbBook(Book, BookDB, BookInfo):
             if posted_date_raw and isinstance(posted_date_raw, bs4.Tag):
                 posted_date = posted_date_raw.get('data-time')
                 if isinstance(posted_date, str) and posted_date.isdecimal():
-                    self.book_posted_date = int()
+                    self.book_posted_date = int(posted_date)
                     logger.debug(f'{self.book_posted_date}')
                 else:
                     logger.error(error_message)
