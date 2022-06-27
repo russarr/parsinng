@@ -99,7 +99,6 @@ class SfSbBook(Book, BookDB, BookInfo):
         logger.debug('Получаем информацию о главах')
         # в название атрибута добавляется unread, если глава не прочитана, и она пролетает мимо поиска, поэтому regex
         chapter_lines = page_soup.find_all('div', class_=re.compile(r"structItem structItem--threadmark\D*"))
-        self.chapters_info_list = []
         if chapter_lines:
             for number, chapter in enumerate(chapter_lines):
                 chapter_info = self._parse_chapter_info(number, chapter)

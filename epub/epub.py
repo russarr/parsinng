@@ -40,10 +40,11 @@ class BookEpub(BookInfo):
             raise CompileException(error_message)
 
     def _create_file_name(self) -> str:
-        logger.debug('Создаем имя книги')
         file_name = self.author_name + ' - ' + self.book_title
-        form_acceptable_name(file_name, file_name_length=75)
-        return file_name + '.epub'
+        file_name = form_acceptable_name(file_name, file_name_length=75)
+        file_name = file_name + '.epub'
+        logger.debug(f'Имя книги {file_name=}')
+        return file_name
 
     def _create_content_and_toc_data(self) -> tuple[str, str]:
         xml_version = '<?xml version="1.0" encoding="utf-8"?>\n'

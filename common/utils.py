@@ -62,9 +62,11 @@ def print_book_info(book_info: BookInfo) -> None:
 
 def form_acceptable_name(file_name: str, file_name_length: int) -> str:
     """Функция убирает недопустимые символы из имени файла"""
+    logger.debug(f'Имя до очиски {file_name=}')
     for letter in file_name:
-        if not letter.isalnum() and letter not in ' -–_$#&@!%(){}¢`~^':
+        if not letter.isalnum() and letter not in ' -–_$#&@!%(){}¢`~^,':
             file_name = file_name.replace(letter, '~')
     if len(file_name) > file_name_length:
         file_name = file_name[:file_name_length]
+    logger.debug(f'Имя после очистки {file_name=}')
     return file_name.strip()
