@@ -8,11 +8,11 @@ modules = (('__main__', 'DEBUG'),
            ('site_parsers.sol.sol_request_authorization', 'INFO'),
            ('site_parsers.sol.sol_requests_soup', 'INFO'),
            ('db_modules.db_common', 'INFO'),
-           ('epub.epub', 'DEBUG'),
+           ('epub.epub', 'INFO'),
            ('site_parsers.sol.sol_monitoring', 'DEBUG'),
            ('site_parsers.sfsb.sf_sb_book', 'DEBUG'),
            ('common.utils', 'INFO'),
-           ('common.common', 'INFO'),
+           ('common.common', 'DEBUG'),
            ('download_book.py', 'DEBUG')
            )
 loggers = {}

@@ -19,8 +19,9 @@ class ChapterInfo:
     chapter_link: str = ''
     chapter_name: str = ''
     book_link: str = ''
-    chapter_updated_date: int = 0
-    chapter_posted_date: int = 0
+    chapter_updated_date: int = field(default=0, compare=False)
+    chapter_posted_date: int = field(default=0, compare=False)
+    chapter_size: int = field(default=0, compare=False)
 
 
 @dataclass()
@@ -31,8 +32,7 @@ class BookInfo:
     author_name: str = ''
     author_link: str = ''
     book_directory: Path = field(repr=False, init=False)
-    chapters_links: tuple[ChapterLinkName, ...] = field(default_factory=tuple)
-    book_size: int = 0
+    book_size: int = field(default=0)
     book_score: float = 0.0
     chapters_info_list: list[ChapterInfo] = field(default_factory=list)
     book_sex_content: str = ''

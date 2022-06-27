@@ -1,8 +1,8 @@
 import re
 from typing import Literal
+import sys
 
 import bs4
-
 from common.utils import create_soup
 from db_modules.db_common import BookDB
 from common.common import Book
@@ -11,19 +11,18 @@ from requests import Session
 from requests.exceptions import JSONDecodeError
 from common.exceptions import GetPageSourseException, ParsingException
 import logging
-from common.project_types import ChapterInfo
+from common.project_types import ChapterInfo, BookInfo
 
 logger = logging.getLogger(__name__)
 
 
-class SfSbBook(Book, BookDB):
+class SfSbBook(Book, BookDB, BookInfo):
     __slots__ = ("book_link",
                  "site_name",
                  "book_title",
                  "author_name",
                  "author_link",
                  "book_directory",
-                 "chapters_links",
                  "book_size",
                  "chapters_info_list",
                  "book_posted_date",
@@ -33,23 +32,24 @@ class SfSbBook(Book, BookDB):
                  "book_status",
                  "book_monitoring_status")
 
-    def __init__(self, site_name: Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net'], book_link: str):
-        super().__init__(book_link)
-        self.site_name = site_name
-        self.book_link = book_link
+    def __init__(self, site_name: Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com'], book_link: str):
+        if not book_link.endswith('/threadmarks'):
+            book_link += '/threadmarks'
+        super().__init__(site_name, book_link)
 
-    def _get_book_info(self) -> None:
+    def _get_book_info(self, session: Session) -> None:
         session = self._create_auth_session()
         book_soup = self._get_sf_sb_soup(session)
         self._get_book_details(book_soup)
         self._create_book_directories()
-        chapter_link = self.chapters_info_list[-1]
 
-
-    def _download_chapter(self, chapter_link: ChapterLinkName, session: Session) -> None:
+    def _download_chapter(self, chapter_link: ChapterInfo, session: Session) -> None:
         chapter_soup = self._get_chapter_soup(chapter_link, session)
         chapter_text = self._get_chapter_text(chapter_soup)
-
+        chapter_link.chapter_size = self._get_chapter_size(chapter_text)
+        self._save_chapter_text_on_disk(chapter_text, chapter_link)
+        # загрузку картинок отключил, ресурс заблокирован, нужно либо прокси, либо vpn
+        # self._get_chapter_images(chapter_soup)
 
     def _get_sf_sb_soup(self, session: Session) -> BeautifulSoup:
         logger.debug('Получаем page sourse основной страницы')
@@ -99,9 +99,12 @@ class SfSbBook(Book, BookDB):
         logger.debug('Получаем информацию о главах')
         # в название атрибута добавляется unread, если глава не прочитана, и она пролетает мимо поиска, поэтому regex
         chapter_lines = page_soup.find_all('div', class_=re.compile(r"structItem structItem--threadmark\D*"))
+        self.chapters_info_list = []
         if chapter_lines:
             for number, chapter in enumerate(chapter_lines):
-                self._parse_chapter_info(number, chapter)
+                chapter_info = self._parse_chapter_info(number, chapter)
+                if chapter_info not in self.chapters_info_list:
+                    self.chapters_info_list.append(chapter_info)
 
         else:
             error_message = f'Ошибка при получении списка глав в книге {self.book_link}'
@@ -119,11 +122,10 @@ class SfSbBook(Book, BookDB):
             raise ParsingException(error_message)
         return hidden_url
 
-    def _parse_chapter_info(self, number: int, chapter_info_block: bs4.Tag) -> None:
+    def _parse_chapter_info(self, number: int, chapter_info_block: bs4.Tag) -> ChapterInfo:
         chapter_order_position = number
         chapter_link, chapter_name = self._get_chapter_link_name(chapter_info_block)
         chapter_posted_date = self._get_chapter_posted_date(chapter_info_block)
-
         chapter_info = ChapterInfo(
             chapter_name=chapter_name,
             chapter_link=chapter_link,
@@ -131,8 +133,7 @@ class SfSbBook(Book, BookDB):
             book_link=self.book_link,
             chapter_posted_date=chapter_posted_date
         )
-        if chapter_info not in self.chapters_info_list:
-            self.chapters_info_list.append(chapter_info)
+        return chapter_info
 
     @staticmethod
     def _get_chapter_posted_date(chapter_info_block: bs4.Tag) -> int:
@@ -179,9 +180,9 @@ class SfSbBook(Book, BookDB):
 
     def _get_book_title(self, book_soup: BeautifulSoup) -> None:
         book_title_raw = book_soup.find(class_="threadmarkListingHeader-name")
-        if book_title_raw:
+        if book_title_raw and isinstance(book_title_raw, bs4.Tag):
             rss_child = book_title_raw.findChild()
-            if rss_child:
+            if rss_child and isinstance(rss_child, bs4.Tag):
                 rss_child.decompose()
             self.book_title = book_title_raw.get_text().strip()
             logger.debug(f'{self.book_title}')
@@ -218,11 +219,16 @@ class SfSbBook(Book, BookDB):
     def _get_book_posted_date(self, book_soup: BeautifulSoup) -> None:
         posted_date_raw = book_soup.find('div', class_="threadmarkListingHeader-stats")
         error_message = f'Не могу получить дату публикации книги {self.book_link}'
-        if posted_date_raw:
+        if posted_date_raw and isinstance(posted_date_raw, bs4.Tag):
             posted_date_raw = posted_date_raw.find('time')
-            if posted_date_raw:
-                self.book_posted_date = int(posted_date_raw.get('data-time'))
-                logger.debug(f'{self.book_posted_date}')
+            if posted_date_raw and isinstance(posted_date_raw, bs4.Tag):
+                posted_date = posted_date_raw.get('data-time')
+                if isinstance(posted_date, str) and posted_date.isdecimal():
+                    self.book_posted_date = int()
+                    logger.debug(f'{self.book_posted_date}')
+                else:
+                    logger.error(error_message)
+                    raise ParsingException(error_message)
             else:
                 logger.error(error_message)
                 raise ParsingException(error_message)
@@ -291,17 +297,27 @@ class SfSbBook(Book, BookDB):
     def _get_chapter_text(chapter_soup: BeautifulSoup) -> str:
         chapter_text_raw = chapter_soup.find('div', class_="message-cell message-cell--main")
         if chapter_text_raw and isinstance(chapter_text_raw, bs4.Tag):
-            chapter_text = chapter_text_raw.get_text().strip()
+            chapter_text = str(chapter_text_raw).strip()
             return chapter_text
+        else:
+            error_message = f'Ошибка получения текста главы'
+            logger.error(error_message)
+            raise ParsingException(error_message)
 
     @staticmethod
     def _clean_soup(chapter_soup: bs4.Tag) -> BeautifulSoup:
         last_edit_block = chapter_soup.find('div', class_="message-lastEdit")
         if last_edit_block and isinstance(last_edit_block, bs4.Tag):
             last_edit_block.decompose()
+
+        message_header = chapter_soup.find('header', class_="message-attribution message-attribution--split")
+        if message_header and isinstance(message_header, bs4.Tag):
+            message_header.decompose()
+
         message_footer = chapter_soup.find('footer', class_="message-footer")
         if message_footer and isinstance(message_footer, bs4.Tag):
             message_footer.decompose()
+
         chapter_soup = create_soup(str(chapter_soup))
         return chapter_soup
 
@@ -318,3 +334,12 @@ class SfSbBook(Book, BookDB):
         else:
             logger.error(error_message)
             raise GetPageSourseException(error_message)
+
+
+
+
+    def _get_book_size(self):
+        book_size = 0
+        for chapter in self.chapters_info_list:
+            book_size += chapter.chapter_size
+        self.book_size = book_size

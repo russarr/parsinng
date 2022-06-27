@@ -4,7 +4,7 @@ import re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from common.exceptions import ParsingException, GetPageSourseException
-from common.project_types import ChapterLinkName, ChapterInfo
+from common.project_types import ChapterInfo
 from common.common import Book
 from common.utils import request_get_image
 from common.utils import create_soup
@@ -22,7 +22,6 @@ class SolBook(SolRequestsSoup, Book):
                  "author_name",
                  "author_link",
                  "book_directory",
-                 "chapters_links",
                  "book_size",
                  "book_score",
                  "chapters_info_list",
@@ -38,10 +37,6 @@ class SolBook(SolRequestsSoup, Book):
                  "book_votes_count",
                  "book_status",
                  "book_monitoring_status")
-
-    def __init__(self, book_link: str):
-        super().__init__(book_link)
-        self.site_name = 'https://storiesonline.net'
 
     @staticmethod
     def _create_auth_session() -> Session:
@@ -59,21 +54,10 @@ class SolBook(SolRequestsSoup, Book):
         self._get_book_cover(book_soup)
         self._get_book_details(session)
 
-    def _download_chapter(self, chapter_link_name: ChapterLinkName, session: Session) -> None:
-        logger.debug(f'Скачиваем главу: {chapter_link_name}')
-        if chapter_link_name:
-            chapter_info = ChapterInfo(chapter_link=chapter_link_name.chapter_link,
-                                       chapter_name=chapter_link_name.chapter_name,
-                                       chapter_file_name=f'chapter_{str(chapter_link_name.chapter_order_position).zfill(4)}.html',
-                                       book_link=self.book_link)
-            chapter_soup = self.get_chapter_soup(chapter_info.chapter_link, session)
-            chapter_info = self._get_chapter(chapter_soup, chapter_info)
-            if chapter_info not in self.chapters_info_list:
-                self.chapters_info_list.append(chapter_info)
-        else:
-            error_message = f'Нет ссылки и имени главы'
-            logger.error(error_message)
-            raise ParsingException(error_message)
+    def _download_chapter(self, chapter_info: ChapterInfo, session: Session) -> None:
+        logger.debug(f'Скачиваем главу: {chapter_info.chapter_link}')
+        chapter_soup = self.get_chapter_soup(chapter_info.chapter_link, session)
+        self._get_chapter(chapter_soup, chapter_info)
 
     def _get_chapter(self, chapter_soup: BeautifulSoup, chapter_info: ChapterInfo) -> ChapterInfo:
         logger.debug('Парсим текст главы')
@@ -83,12 +67,12 @@ class SolBook(SolRequestsSoup, Book):
             chapter_soup = self._clear_chapter_soup(chapter_soup)
             chapter_soup = self._get_chapter_images(chapter_soup)
             chapter_text = self._get_chapter_text(chapter_soup)
+            chapter_info.chapter_size = self._get_chapter_size(chapter_text)
             self._save_chapter_text_on_disk(chapter_text, chapter_info)
         else:
             error_message = 'Не могу найти тэг article'
             logger.error(error_message)
             raise ParsingException('Не могу найти тэг article')
-
         return chapter_info
 
     @staticmethod
@@ -115,10 +99,11 @@ class SolBook(SolRequestsSoup, Book):
         """функция для удаления со страницы даты, ссылки на слудующую главу, формы голосования и т.д."""
         logger.debug('Удаляем лишнее из текста')
         tags_to_clear = ['div[class="date"]', 'a[accesskey="n"]', 'form[id="voteForm"]', 'div[class="end-note"]', 'div[class="vform"]']
-        for tag in tags_to_clear:
-            tag_to_delete = chapter_soup.select_one(tag)
-            if tag_to_delete:
-                tag_to_delete.decompose()
+        for tag_type in tags_to_clear:
+            tags_to_delete = chapter_soup.find_all(tag_type)
+            for tag in tags_to_delete:
+                if tag and isinstance(tag, bs4.Tag):
+                    tag.decompose()
         return chapter_soup
 
     def _get_chapter_text(self, soup: BeautifulSoup) -> str:
@@ -155,10 +140,16 @@ class SolBook(SolRequestsSoup, Book):
     def _get_chapters_links(self, book_soup: BeautifulSoup) -> None:
         logger.debug('получаем список ссылок на главы')
         soup = book_soup.find('div', id="index-list")
-        if soup:
-            assert isinstance(soup, bs4.Tag)
-            self.chapters_links = tuple(ChapterLinkName(chapter_link=link[1].get('href'), chapter_name=link[1].text, chapter_order_position=link[0]) for link in enumerate(soup.findAll('a')))
-            logger.debug(f'{self.chapters_links=}')
+        if soup and isinstance(soup, bs4.Tag):
+            for link in enumerate(soup.findAll('a')):
+                chapter_info = ChapterInfo(
+                    chapter_link=link[1].get('href'),
+                    chapter_name=link[1].text,
+                    chapter_file_name=f'chapter_{str(link[0]).zfill(4)}.html',
+                    book_link=self.book_link
+                )
+                if chapter_info not in self.chapters_info_list:
+                    self.chapters_info_list.append(chapter_info)
         else:
             logger.error('Не умею загружать короткие истории без списка глав')
             raise ParsingException('Не умею загружать короткие истории без списка глав')

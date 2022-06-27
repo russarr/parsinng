@@ -5,25 +5,29 @@ from bs4 import BeautifulSoup
 from common.project_types import BookInfo
 from common.exceptions import GetPageSourseException
 from requests import Session
+from typing import Callable
+import re
 
 
 logger = logging.getLogger(__name__)
 
 
-def parse_book_url(book_url: str) -> tuple[str, str]:
-    """возвращает site_name, book_link"""
-    logger.debug(f'парсим url {book_url}')
-    for site_name in ['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net']:
-        if book_url.startswith(site_name):
-            if site_name in ['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com'] and not book_url.endswith('/threadmarks'):
-                book_url += '/threadmarks'
-            book_link = book_url.replace(site_name, '')
-            logger.debug(f'результат парсинга:{site_name=}, {book_link=}')
-            return site_name, book_link
+def parse_book_url(book_url: str, choose_book_class: dict[str, Callable]) -> tuple[str, str, Callable]:
+    """возвращает site_name, book_link, book_class"""
+    logger.debug(f'{book_url}')
+    error_message = f'{book_url=} - неподходящий url'
+    site_name_raw = re.match(r'^(https://.+?)/', book_url)
+    logger.debug(f'{site_name_raw}')
+    if site_name_raw:
+        site_name = site_name_raw.group(1)
+
     else:
-        error_message = f'{book_url} - wrong url'
         logger.error(error_message)
         raise GetPageSourseException(error_message)
+
+    book_link = book_url.replace(site_name, '')
+
+    return site_name, book_link, choose_book_class[site_name]
 
 
 def request_get_image(image_link: str) -> requests.Response:

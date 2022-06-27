@@ -45,8 +45,6 @@ class BookEpub(BookInfo):
         form_acceptable_name(file_name, file_name_length=75)
         return file_name + '.epub'
 
-
-
     def _create_content_and_toc_data(self) -> tuple[str, str]:
         xml_version = '<?xml version="1.0" encoding="utf-8"?>\n'
         package_start = '<package version="2.0" unique-identifier="BookId" xmlns="https://www.idpf.org/2007/opf">\n'

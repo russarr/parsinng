@@ -250,7 +250,6 @@ class BookDBWrite(BookInfo):
         try:
             logger.debug(f'проверяем наличие автора в БД {self.author_link}')
             cur.execute("""SELECT * FROM authors WHERE author_link=?""", (self.author_link,))
-            print(cur.fetchone())
             return True if cur.fetchone() else False
         except sq.Error as e:
             error_message = f'Проблемы при проверки наличия автора {self.author_link} в БД. {e}'
