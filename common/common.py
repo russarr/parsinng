@@ -1,3 +1,4 @@
+import requests.exceptions
 from bs4 import BeautifulSoup
 from db_modules.db_common import BookDB
 from epub.epub import BookEpub
@@ -17,12 +18,13 @@ import random
 
 logger = logging.getLogger(__name__)
 
+
 class Book(BookDB, BookEpub):
 
-    def __init__(self, site_name: Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net'], book_link: str):
+    def __init__(self, book_link: str, site_name: Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net']):
         super().__init__(book_link)
         self.site_name = site_name
-        self.book_link = book_link
+        # self.book_link = book_link
 
     def downoload_book(self, session: Session | None = None, redownload: bool = False) -> Session:
         """Фукнция скачивания или обновления книги."""
@@ -40,7 +42,13 @@ class Book(BookDB, BookEpub):
 
         self._get_book_info(session)
         for chapter in tqdm(self.chapters_info_list):
-            self._download_chapter(chapter, session)
+            try:
+                self._download_chapter(chapter, session)
+            except requests.exceptions.ConnectionError:  # в случае потери соединенеия, переподключение через 30с
+                logger.exception('Дисконект')
+                time.sleep(30)
+                session = self._create_auth_session()
+                self._download_chapter(chapter, session)
             time.sleep(random.randint(1, 3))
         self.calculate_book_size()
         self.add_book_to_db()
@@ -51,14 +59,16 @@ class Book(BookDB, BookEpub):
         logger.debug('Начинаем обновление книги')
         self.read_book_info_from_db()
         sorted_chapters_list_in_db = self._get_sorted_chapters()
+        book_updated_date_in_db = self.book_updated_date
         self._get_book_info(session)
-        for chapter in tqdm(self.chapters_info_list):
-            if chapter.chapter_link not in sorted_chapters_list_in_db[:-1]:
-                self._download_chapter(chapter, session)
-                time.sleep(random.randint(1, 3))
-        self.calculate_book_size()
-        self.update_book_in_db()
-        self.compile_epub_file()
+        if self.book_updated_date > book_updated_date_in_db:
+            for chapter in tqdm(self.chapters_info_list):
+                if chapter.chapter_link not in sorted_chapters_list_in_db[:-1]:
+                    self._download_chapter(chapter, session)
+                    time.sleep(random.randint(1, 3))
+            self.calculate_book_size()
+            self.update_book_in_db()
+            self.compile_epub_file()
 
     def _get_book_info(self, session: Session) -> None:
         raise NotImplementedError('Метод не переопределен _get_book_info')
@@ -82,9 +92,11 @@ class Book(BookDB, BookEpub):
         try:
             book_images_path.mkdir(parents=True, exist_ok=True)
             book_texts_path.mkdir(parents=True, exist_ok=True)
-        except PermissionError as e:
-            logger.exception(f'Ошибка создания папки на диске')
-            raise ParsingException(f'Ошибка создания папки на диске {e}')
+        except PermissionError:
+            error_message = f'Ошибка создания папки на диске {book_directory}'
+            logger.exception(error_message)
+            raise ParsingException(error_message)
+
         self.book_directory = book_path
         logger.debug(f'{self.book_directory=}')
 
@@ -134,11 +146,14 @@ class Book(BookDB, BookEpub):
     def _get_chapter_size(chapter_text: str) -> int:
         chapter_text = create_soup(chapter_text).get_text()
         chapter_size = len(chapter_text.encode('utf-8'))
-        return int(chapter_size/1024)
+        return int(chapter_size / 1024)
 
     def calculate_book_size(self) -> None:
         book_size = 0
         for chapter in self.chapters_info_list:
             book_size += chapter.chapter_size
-        logger.debug(f'calculate {book_size=}, {self.book_size=}')
         self.book_size = book_size
+
+    def _clear_description(self) -> None:
+        """Убирает символы, из-за которых epub ломается"""
+        self.book_description = self.book_description.replace('&', 'and')

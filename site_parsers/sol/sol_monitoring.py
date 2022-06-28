@@ -10,7 +10,8 @@ import pickle
 import logging
 from typing import Literal
 from pathlib import Path
-from db_modules.db_common import get_monitoring_authors_list, get_monitoring_stories_list
+from db_modules.db_common import get_sol_monitoring_authors_list, get_sf_sb_monitoring_stories_list
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -20,21 +21,24 @@ def check_sol_updates() -> None:
     session = create_sol_auth_session()
     _check_sol_updates_page(session)
     _check_sol_new_story_page(session)
+    session.close()
 
 
 def _check_sol_updates_page(session: Session) -> None:
     page_soup = _get_upd_new_page_soup(session, 'upd')
     upd_stories_list = _get_upd_stories_download_list(page_soup)
-    for book_link in upd_stories_list:
+    print('Проверяем страницу с обновленными историями')
+    for book_link in tqdm(upd_stories_list):
         book = SolBook(book_link)
         book.downoload_book(session)
         time.sleep(3)
 
 
 def _check_sol_new_story_page(session: Session) -> None:
+    print('Проверяем страницу с новыми историями')
     page_soup = _get_upd_new_page_soup(session, 'new')
     new_stories_list = get_new_stories_download_list(page_soup)
-    for book_link in new_stories_list:
+    for book_link in tqdm(new_stories_list):
         book = SolBook(book_link)
         book.downoload_book(session)
         time.sleep(3)
@@ -42,7 +46,7 @@ def _check_sol_new_story_page(session: Session) -> None:
 
 def get_new_stories_download_list(page_soup: BeautifulSoup) -> list[str]:
     link_list = _get_new_stories_link_list(page_soup)
-    monitoring_list = get_monitoring_authors_list()
+    monitoring_list = get_sol_monitoring_authors_list()
     list_to_download = [link[1] for link in link_list if link[0] in monitoring_list]
     return list_to_download
 
@@ -95,7 +99,7 @@ def _get_upd_new_page_soup(session: Session, page_type: Literal['new', 'upd']) -
 
 def _get_upd_stories_download_list(page_soup: BeautifulSoup) -> tuple[str, ...]:
     link_list = _get_updates_stories_link_list(page_soup)
-    monitoring_list = get_monitoring_stories_list()
+    monitoring_list = get_sf_sb_monitoring_stories_list()
     list_to_download = tuple(link for link in link_list if link in monitoring_list)
     return list_to_download
 

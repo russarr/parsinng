@@ -11,6 +11,7 @@ from common.utils import create_soup
 from requests import Session
 from site_parsers.sol.sol_request_authorization import create_sol_auth_session
 from site_parsers.sol.sol_requests_soup import SolRequestsSoup
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,10 @@ class SolBook(SolRequestsSoup, Book):
                  "book_votes_count",
                  "book_status",
                  "book_monitoring_status")
+
+    def __init__(self, book_link: str, site_name: Literal['https://storiesonline.net'] = 'https://storiesonline.net'):
+        super().__init__(book_link, site_name)
+
 
     @staticmethod
     def _create_auth_session() -> Session:
@@ -98,9 +103,14 @@ class SolBook(SolRequestsSoup, Book):
     def _clear_chapter_soup(chapter_soup: BeautifulSoup) -> BeautifulSoup:
         """функция для удаления со страницы даты, ссылки на слудующую главу, формы голосования и т.д."""
         logger.debug('Удаляем лишнее из текста')
-        tags_to_clear = ['div[class="date"]', 'a[accesskey="n"]', 'form[id="voteForm"]', 'div[class="end-note"]', 'div[class="vform"]']
+        tags_to_clear: list[dict[str, dict[str, str]]] = [{'div': {'class': "date"}},
+                                                          {'a': {'accesskey': "n"}},
+                                                          {'form': {'id': "voteForm"}},
+                                                          {'div': {'class': "end-note"}},
+                                                          {'div': {'class': "vform"}}]
         for tag_type in tags_to_clear:
             tags_to_delete = chapter_soup.find_all(tag_type)
+            logger.debug(f'{tags_to_delete=}')
             for tag in tags_to_delete:
                 if tag and isinstance(tag, bs4.Tag):
                     tag.decompose()
@@ -182,6 +192,7 @@ class SolBook(SolRequestsSoup, Book):
         if book_details_soup:
             book_details = str(find_result)
             self._get_book_description(book_details)
+            self._clear_description()
             self._get_book_sex_content(book_details)
             self._get_book_genre(book_details)
             self._get_book_tags(book_details)
@@ -212,7 +223,7 @@ class SolBook(SolRequestsSoup, Book):
             raise GetPageSourseException(error_message)
 
     def _get_book_description(self, book_details: str) -> None:
-        book_description_search = re.search(r'<b>Synopsis:</b>(.*)<br/>', book_details)
+        book_description_search = re.search('<b>Synopsis:</b>\s*(.+?)<br/>', book_details, flags=re.DOTALL)
         book_description = str(book_description_search.group(1)).strip() if book_description_search else ''
         self.book_description = book_description
 
@@ -246,7 +257,7 @@ class SolBook(SolRequestsSoup, Book):
         self.book_votes_count = book_votes_count
 
     def _get_book_score(self, book_details: str) -> None:
-        book_score_search = re.search(r'<b>Score:</b>\s*(\d*\.\d+|\d+)\\n', book_details)
+        book_score_search = re.search(r'<b>Score:</b>\s*(\d*\.\d+|\d+)', book_details)
         logger.debug(f'{book_score_search=}')
         book_score = float(book_score_search.group(1).strip()) if book_score_search else 0.0
         self.book_score = book_score
@@ -281,10 +292,13 @@ class SolBook(SolRequestsSoup, Book):
             self.book_status = 'Concluded'
         if book_status_raw == 'in progress':
             self.book_status = 'In progress'
+        elif book_status_raw == '':
+            self.book_status = 'In progress'
 
         if self.book_status not in ('Frozen', 'Concluded', 'In progress'):
-            logger.error(f'Неизвестный статус {book_status_raw}')
-            raise ParsingException(f'Неизвестный статус {book_status_raw}')
+            error_message = f'Неизвестный статус {book_status_raw=}'
+            logger.error(error_message)
+            raise ParsingException(error_message)
 
     def _get_sol_book_id(self) -> str:
         if self.book_link:

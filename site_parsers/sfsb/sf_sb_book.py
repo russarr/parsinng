@@ -1,7 +1,5 @@
 import re
 from typing import Literal
-import sys
-
 import bs4
 from common.utils import create_soup
 from db_modules.db_common import BookDB
@@ -32,10 +30,10 @@ class SfSbBook(Book, BookDB, BookInfo):
                  "book_status",
                  "book_monitoring_status")
 
-    def __init__(self, site_name: Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com'], book_link: str):
+    def __init__(self, book_link: str, site_name: Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com']):
         if not book_link.endswith('/threadmarks'):
             book_link += '/threadmarks'
-        super().__init__(site_name, book_link)
+        super().__init__(book_link, site_name)
 
     def _get_book_info(self, session: Session) -> None:
         session = self._create_auth_session()
@@ -174,6 +172,7 @@ class SfSbBook(Book, BookDB, BookInfo):
         self._get_book_title(book_soup)
         self._get_author_info(book_soup)
         self._get_book_description(book_soup)
+        self._clear_description()
         self._get_book_dates(book_soup)
         self._get_book_status(book_soup)
 
@@ -250,10 +249,15 @@ class SfSbBook(Book, BookDB, BookInfo):
             book_status_items = book_status_raw.find_all('dl', class_="pairs pairs--rows")
             if book_status_items:
                 try:
-                    book_status_raw = book_status_items[1]
-                    book_status = book_status_raw.find('dd').get_text()
-                    self._parse_book_status(book_status)
-                except (IndexError, AttributeError):
+                    book_status_raw_block = book_status_items[1]
+                    book_status_raw = book_status_raw_block.find('dd')
+                    if book_status_raw and isinstance(book_status_raw, bs4.Tag):
+                        book_status = book_status_raw.get_text()
+                        self._parse_book_status(book_status)
+                    else:
+                        logger.error(error_message)
+                        raise ParsingException(error_message)
+                except IndexError:
                     logger.exception(error_message)
                     raise ParsingException(error_message)
             else:
@@ -333,12 +337,3 @@ class SfSbBook(Book, BookDB, BookInfo):
         else:
             logger.error(error_message)
             raise GetPageSourseException(error_message)
-
-
-
-
-    def _get_book_size(self):
-        book_size = 0
-        for chapter in self.chapters_info_list:
-            book_size += chapter.chapter_size
-        self.book_size = book_size

@@ -39,7 +39,7 @@ class SolRequestsSoup(BookInfo):
             chapter_soup_full = self._bypass_bot_protection(session, chapter_soup_1)
             return chapter_soup_full
         else:
-            logger.info('Глава короткая, без защиты')
+            logger.debug('Глава короткая, без защиты')
             return chapter_soup_1
 
     def _bypass_bot_protection(self, session: Session, chapter_soup_1: BeautifulSoup) -> BeautifulSoup:

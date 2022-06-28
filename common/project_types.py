@@ -2,15 +2,9 @@ import logging
 from common.exceptions import GetPageSourseException  # type: ignore
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import Literal
 
 logger = logging.getLogger('logger')
-
-
-# class ChapterLinkName(NamedTuple):
-#     chapter_link: str
-#     chapter_name: str
-#     chapter_order_position: int
 
 
 @dataclass
@@ -41,9 +35,9 @@ class BookInfo:
     book_download_date: int = 0
     book_description: str = ''
     book_genre: str = ''
-    book_series: str = 'field(default='')'
+    book_series: str = field(default='')
     book_tags: tuple[str, ...] = field(default_factory=tuple)
     book_series_order_position: int = 0
     book_votes_count: int = 0
-    book_status: Literal['In progress', 'Concluded', 'Frozen'] = field(repr=False, init=False)
+    book_status: Literal['In progress', 'Concluded', 'Frozen', 'Unknown'] = field(repr=False, default='Unknown')
     book_monitoring_status: bool = False

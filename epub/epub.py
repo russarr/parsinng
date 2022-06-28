@@ -34,7 +34,7 @@ class BookEpub(BookInfo):
                     zf.writestr('OEBPS/Text/' + chapter[0], chapter[1])
                 for image in images_files:
                     zf.write(image[1], 'OEBPS/Images/' + image[0])
-                logger.info(f'Сохранена книга {save_path}')
+                logger.info(f'Сохранена книга {file_name}')
         except OSError as e:
             error_message = f'Ошибка при архивации epub файла: {e}'
             raise CompileException(error_message)
@@ -48,7 +48,7 @@ class BookEpub(BookInfo):
 
     def _create_content_and_toc_data(self) -> tuple[str, str]:
         xml_version = '<?xml version="1.0" encoding="utf-8"?>\n'
-        package_start = '<package version="2.0" unique-identifier="BookId" xmlns="https://www.idpf.org/2007/opf">\n'
+        package_start = '<package version="2.0" unique-identifier="BookId" xmlns="http://www.idpf.org/2007/opf">\n'
         package_end = '</package>\n'
         metadata = self._create_metadata()
         images_files_list = self._get_files_list()
@@ -61,7 +61,7 @@ class BookEpub(BookInfo):
     def _create_metadata(self) -> str:
         metadata_start = '\t<metadata xmlns:dc="https://purl.org/dc/elements/1.1/" xmlns:opf="https://www.idpf.org/2007/opf">\n'
         metadata_end = '\t</metadata>\n'
-        metadata_id = f'\t\t<dc:identifier id="BookId">{self.book_title}</dc:identifier>\n'
+        metadata_id = f'\t\t<dc:identifier id="BookId">"BookId"</dc:identifier>\n'
         metadata_book_title = f'\t\t<dc:title>{self.book_title}</dc:title>\n'
         metadata_book_author = f'\t\t<dc:creator opf:role="">{self.author_name}</dc:creator>\n'
         posted_date = datetime.fromtimestamp(self.book_posted_date).strftime("%d-%b-%Y")
@@ -89,7 +89,7 @@ class BookEpub(BookInfo):
 
     def _create_spine_data(self) -> str:
         text_files_list = [chapter.chapter_file_name for chapter in self.chapters_info_list]
-        spine_start = '\t<spine toc="ncx">\n\t\t<itemref idref="titlepage.html" linear="no"/>\n'
+        spine_start = '\t<spine toc="ncx">\n\t\t<itemref idref="titlepage.html"/>\n'
         spine_end = '\t</spine>\n'
         spine_chapters_data = ''.join([f'\t\t<itemref idref="{file_name}"/>\n' for file_name in text_files_list])
         return ''.join((spine_start, spine_chapters_data, spine_end))
@@ -133,10 +133,10 @@ class BookEpub(BookInfo):
         title_page_book_description = f'\t<div><text>\t{self.book_description}</text></div>\n'
         title_page_book_size = f'\t<div><text><b>Размер:</b> {self.book_size} Кб'
         title_page_book_status = f'\t<b>Статус:</b> {self.book_status}</text></div>\n'
-        title_page_book_score = f'\t<div></text><b>Оценка:</b> {self.book_score}'
+        title_page_book_score = f'\t<div><text><b>Оценка:</b> {self.book_score}'
         title_page_book_genre = f'\t<b>Жанр:</b> {self.book_genre}</text></div>\n'
-        title_page_book_tags = f'\t<div></text><b>Тэги:</b> {book_tags}</text></div>\n'
-        title_page_book_dates = f'\t<div></text><b>Дата публикации:</b> {posted_date} <b>Последнее обновление:</b> {updated_date}</text></div>\n'
+        title_page_book_tags = f'\t<div><text><b>Тэги:</b> {book_tags}</text></div>\n'
+        title_page_book_dates = f'\t<div><text><b>Дата публикации:</b> {posted_date} <b>Последнее обновление:</b> {updated_date}</text></div>\n'
         title_page_end = '</body>\n</html>'
         return ''.join([title_page_start, title_page_cover, title_page_book_description,
                         title_page_book_size, title_page_book_status, title_page_book_score,

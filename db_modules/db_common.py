@@ -111,20 +111,26 @@ def check_book_link_in_db(book_link: str) -> bool:
         return True if cur.fetchone() else False
 
 
-def get_monitoring_stories_list() -> tuple[str, ...]:
+def get_sf_sb_monitoring_stories_list() -> tuple[tuple[str, str], ...]:
     db_path = check_db_file()
     with sq.connect(db_path) as books_db:
         cur = books_db.cursor()
-        cur.execute("SELECT book_link FROM books WHERE book_monitor_status = 1""")
-        monitoring_book_list = tuple(book[0] for book in cur.fetchall() if book)
+        cur.execute("""SELECT book_link, site_name
+            FROM books
+            WHERE book_monitor_status = 1
+            AND site_name IN ('https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com')
+            AND book_status != 'Concluded'""")
+        monitoring_book_list = tuple((book[0], book[1]) for book in cur.fetchall() if book)
     return monitoring_book_list
 
 
-def get_monitoring_authors_list() -> tuple[str, ...]:
+def get_sol_monitoring_authors_list() -> tuple[str, ...]:
     db_path = check_db_file()
     with sq.connect(db_path) as books_db:
         cur = books_db.cursor()
-        cur.execute("SELECT author_link FROM authors WHERE monitor_status = 1""")
+        cur.execute("""SELECT authors.author_link FROM authors 
+        JOIN books ON authors.author_link = books.author_link
+        WHERE monitor_status = 1 AND books.site_name = 'https://storiesonline.net'""")
         monitoring_book_list = tuple(author[0] for author in cur.fetchall() if author)
     return monitoring_book_list
 
