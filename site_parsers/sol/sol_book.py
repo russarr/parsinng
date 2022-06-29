@@ -9,7 +9,7 @@ from common.common import Book
 from common.utils import request_get_image
 from common.utils import create_soup
 from requests import Session
-from site_parsers.sol.sol_request_authorization import create_sol_auth_session
+from common.request_authorization import create_auth_session
 from site_parsers.sol.sol_requests_soup import SolRequestsSoup
 from typing import Literal
 
@@ -46,7 +46,7 @@ class SolBook(SolRequestsSoup, Book):
     @staticmethod
     def _create_auth_session() -> Session:
         logger.debug('Создаем сессию')
-        session = create_sol_auth_session()
+        session = create_auth_session(site_alias='sol')
         return session
 
     def _get_book_info(self, session: Session) -> None:

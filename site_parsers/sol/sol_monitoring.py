@@ -1,6 +1,6 @@
 import time
 
-from site_parsers.sol.sol_request_authorization import create_sol_auth_session
+from common.request_authorization import create_auth_session
 from requests import Session
 from bs4 import BeautifulSoup
 from common.exceptions import GetPageSourseException, ParsingException
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def check_sol_updates() -> None:
     logger.debug('Проверяемя страницу обновлений и страницу новых историй')
-    session = create_sol_auth_session()
+    session = create_auth_session(site_alias='sol')
     _check_sol_updates_page(session)
     _check_sol_new_story_page(session)
     session.close()

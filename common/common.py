@@ -5,7 +5,8 @@ from epub.epub import BookEpub
 from requests import Session
 from db_modules.db_common import check_book_link_in_db
 from common.project_types import ChapterInfo
-from common.utils import create_request_session, create_soup
+from common.utils import create_soup
+from common.request_authorization import create_request_session
 from pathlib import Path
 from common.exceptions import ParsingException
 from common.utils import form_acceptable_name, request_get_image
@@ -29,6 +30,7 @@ class Book(BookDB, BookEpub):
     def downoload_book(self, session: Session | None = None, redownload: bool = False) -> Session:
         """Фукнция скачивания или обновления книги."""
         if session is None:
+            logger.debug('Сессия не передана, создаем сессию')
             session = self._create_auth_session()
         if check_book_link_in_db(self.book_link) and not redownload:
             self._update_book(session)

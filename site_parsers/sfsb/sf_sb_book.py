@@ -1,4 +1,5 @@
 import re
+import time
 from typing import Literal
 import bs4
 from common.utils import create_soup
@@ -36,7 +37,6 @@ class SfSbBook(Book, BookDB, BookInfo):
         super().__init__(book_link, site_name)
 
     def _get_book_info(self, session: Session) -> None:
-        session = self._create_auth_session()
         book_soup = self._get_sf_sb_soup(session)
         self._get_book_details(book_soup)
         self._create_book_directories()
@@ -58,6 +58,9 @@ class SfSbBook(Book, BookDB, BookInfo):
             self._get_chapters_info(page_soup)
         except ParsingException:
             # повторное выполнение в случае ошибки
+
+            print('ПОВТОРНАЯ ПОПЫТКА')
+            time.sleep(5)
             self._get_chapters_info(page_soup)
         return page_soup
 

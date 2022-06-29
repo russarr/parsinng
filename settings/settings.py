@@ -5,7 +5,7 @@ from common.utils import send_telegram_message
 
 modules = (('__main__', 'DEBUG'),
            ('site_parsers.sol.sol_book', 'INFO'),
-           ('site_parsers.sol.sol_request_authorization', 'INFO'),
+           ('common.request_authorization', 'DEBUG'),
            ('site_parsers.sol.sol_requests_soup', 'INFO'),
            ('db_modules.db_common', 'INFO'),
            ('epub.epub', 'INFO'),
@@ -14,8 +14,8 @@ modules = (('__main__', 'DEBUG'),
            ('site_parsers.sfsb.sf_sb_monitoring', 'INFO'),
            ('common.utils', 'INFO'),
            ('common.common', 'INFO'),
-           ('download_book', 'DEBUG'),
-           ('monitoring', 'DEBUG')
+           ('download_book', 'INFO'),
+           ('monitoring', 'INFO')
            )
 loggers = {}
 for logger in modules:

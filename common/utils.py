@@ -4,7 +4,6 @@ import requests
 from bs4 import BeautifulSoup
 from common.project_types import BookInfo
 from common.exceptions import GetPageSourseException
-from requests import Session
 from typing import Callable
 import re
 import dotenv
@@ -42,20 +41,6 @@ def request_get_image(image_link: str) -> requests.Response:
 def create_soup(page_source: str) -> BeautifulSoup:
     soup = BeautifulSoup(page_source, 'html5lib')
     return soup
-
-
-def create_request_session() -> Session:
-    logger.debug('Создаем сессию')
-    user = fake_useragent.UserAgent().random
-    header = {'user-agent': user,
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-              'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-              'DNT': '1',
-              'Upgrade-Insecure-Requests': '1'
-              }
-    session = Session()
-    session.headers.update(header)
-    return session
 
 
 def print_book_info(book_info: BookInfo) -> None:

@@ -1,7 +1,7 @@
 from db_modules.db_common import get_sf_sb_monitoring_stories_list
 from site_parsers.sfsb.sf_sb_book import SfSbBook
 import logging
-from common.utils import create_request_session
+from common.request_authorization import create_request_session
 from tqdm import tqdm
 import time
 
