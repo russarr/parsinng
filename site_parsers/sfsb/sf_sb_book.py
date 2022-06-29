@@ -54,7 +54,11 @@ class SfSbBook(Book, BookDB, BookInfo):
         response = session.get(self.site_name + self.book_link)
         page_soup = create_soup(response.text)
         page_soup = self._open_hidden_chapters(page_soup, session)
-        self._get_chapters_info(page_soup)
+        try:
+            self._get_chapters_info(page_soup)
+        except ParsingException:
+            # повторное выполнение в случае ошибки
+            self._get_chapters_info(page_soup)
         return page_soup
 
     def _open_hidden_chapters(self, page_soup: BeautifulSoup, session: Session) -> BeautifulSoup:

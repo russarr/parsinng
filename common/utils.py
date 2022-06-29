@@ -7,7 +7,9 @@ from common.exceptions import GetPageSourseException
 from requests import Session
 from typing import Callable
 import re
-
+import dotenv
+import os
+import urllib3
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,7 @@ def create_request_session() -> Session:
     session.headers.update(header)
     return session
 
+
 def print_book_info(book_info: BookInfo) -> None:
     for line in book_info.__dict__:
         print(line, book_info.__getattribute__(line))
@@ -70,3 +73,15 @@ def form_acceptable_name(file_name: str, file_name_length: int) -> str:
         file_name = file_name[:file_name_length]
     logger.debug(f'Имя после очистки {file_name=}')
     return file_name.strip()
+
+
+def send_telegram_message(text: str) -> None:
+    dotenv.load_dotenv()
+    token = os.getenv('TELEGRAM_BOT_TOKEN')
+    chat_id = os.getenv('TELEGRAM_CHAT_ID')
+
+    url = f'https://api.telegram.org/bot{token}/sendMessage'
+    post_data = {'chat_id': chat_id,
+                 'text': text}
+    http = urllib3.PoolManager()
+    http.request(method='POST', url=url, fields=post_data)

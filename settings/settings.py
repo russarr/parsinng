@@ -1,7 +1,7 @@
 from logging import Handler, LogRecord
-import urllib3
 import dotenv
 import os
+from common.utils import send_telegram_message
 
 modules = (('__main__', 'DEBUG'),
            ('site_parsers.sol.sol_book', 'INFO'),
@@ -9,12 +9,13 @@ modules = (('__main__', 'DEBUG'),
            ('site_parsers.sol.sol_requests_soup', 'INFO'),
            ('db_modules.db_common', 'INFO'),
            ('epub.epub', 'INFO'),
-           ('site_parsers.sol.sol_monitoring', 'DEBUG'),
+           ('site_parsers.sol.sol_monitoring', 'INFO'),
            ('site_parsers.sfsb.sf_sb_book', 'INFO'),
-           ('site_parsers.sfsb.sf_sb_monitoring', 'DEBUG'),
+           ('site_parsers.sfsb.sf_sb_monitoring', 'INFO'),
            ('common.utils', 'INFO'),
            ('common.common', 'INFO'),
-           ('download_book.py', 'DEBUG')
+           ('download_book', 'DEBUG'),
+           ('monitoring', 'DEBUG')
            )
 loggers = {}
 for logger in modules:
@@ -50,11 +51,8 @@ class TelegramBotHandler(Handler):
         self.chat_id = chat_id
 
     def emit(self, record: LogRecord) -> None:
-        url = f'https://api.telegram.org/bot{self.token}/sendMessage'
-        post_data = {'chat_id': self.chat_id,
-                     'text': self.format(record)}
-        http = urllib3.PoolManager()
-        http.request(method='POST', url=url, fields=post_data)
+        send_telegram_message(self.format(record))
+
 
 
 handlers = {

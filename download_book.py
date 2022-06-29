@@ -12,6 +12,7 @@ from settings.settings import LOGGING_CONFIG
 
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 def main() -> None:
@@ -22,7 +23,7 @@ def main() -> None:
                          }
     book_url = clipboard.paste()
     site_name, book_link, book_class = parse_book_url(book_url, choose_book_class)
-    book = book_class(site_name, book_link)
+    book = book_class(book_link, site_name)
     session = None
     try:
         session = book.downoload_book(session=session, redownload=False)

@@ -100,6 +100,12 @@ def create_db() -> None:
             FOREIGN KEY (book_link) REFERENCES books(book_link),
             CONSTRAINT book_tag UNIQUE (tag,book_link)
             )""")
+
+        cur.execute("""DROP TABLE IF EXISTS wormstorysearch""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS wormstorysearch (
+            book_url TEXT(150) NOT NULL PRIMARY KEY,
+            book_name TEXT(200) NOT NULL DEFAULT ''
+            )""")
         logger.info(f'Создана БД: {db_path}')
 
 

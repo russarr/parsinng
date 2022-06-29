@@ -3,6 +3,7 @@ from site_parsers.sfsb.sf_sb_book import SfSbBook
 import logging
 from common.utils import create_request_session
 from tqdm import tqdm
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -14,4 +15,5 @@ def check_sf_sb_updates() -> None:
     for book_url_data in tqdm(monitoring_list):
         book = SfSbBook(*book_url_data)
         book.downoload_book(session)
+        time.sleep(1)
     session.close()
