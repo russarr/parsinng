@@ -4,8 +4,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-logger = logging.getLogger('logger')
+logger = logging.getLogger(__name__)
 
+site_names_type = Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net', 'https://ficbook.net']
+book_status_type = Literal['In progress', 'Concluded', 'Frozen', 'Unknown']
 
 @dataclass
 class ChapterInfo:
@@ -21,11 +23,11 @@ class ChapterInfo:
 @dataclass()
 class BookInfo:
     book_link: str
-    site_name: Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net'] = field(init=False)
+    site_name: site_names_type = field(init=False)
     book_title: str = ''
     author_name: str = ''
     author_link: str = ''
-    book_directory: Path = field(repr=False, init=False)
+    book_directory: Path = field(default_factory=Path)
     book_size: int = field(default=0)
     book_score: float = 0.0
     chapters_info_list: list[ChapterInfo] = field(default_factory=list)
@@ -39,5 +41,5 @@ class BookInfo:
     book_tags: tuple[str, ...] = field(default_factory=tuple)
     book_series_order_position: int = 0
     book_votes_count: int = 0
-    book_status: Literal['In progress', 'Concluded', 'Frozen', 'Unknown'] = field(repr=False, default='Unknown')
+    book_status: book_status_type = field(repr=False, default='Unknown')
     book_monitoring_status: bool = False

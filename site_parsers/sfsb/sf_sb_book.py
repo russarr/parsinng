@@ -50,7 +50,7 @@ class SfSbBook(Book, BookDB, BookInfo):
         # self._get_chapter_images(chapter_soup)
 
     def _get_sf_sb_soup(self, session: Session) -> BeautifulSoup:
-        logger.debug('Получаем page sourse основной страницы')
+        logger.debug('Получаем page sourse основной страницы книги')
         response = session.get(self.site_name + self.book_link)
         page_soup = create_soup(response.text)
         page_soup = self._open_hidden_chapters(page_soup, session)
@@ -58,7 +58,6 @@ class SfSbBook(Book, BookDB, BookInfo):
             self._get_chapters_info(page_soup)
         except ParsingException:
             # повторное выполнение в случае ошибки
-
             print('ПОВТОРНАЯ ПОПЫТКА')
             time.sleep(5)
             self._get_chapters_info(page_soup)

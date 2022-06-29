@@ -4,14 +4,14 @@ from db_modules.db_common import BookDB
 from epub.epub import BookEpub
 from requests import Session
 from db_modules.db_common import check_book_link_in_db
-from common.project_types import ChapterInfo
+from common.project_types import ChapterInfo, site_names_type
 from common.utils import create_soup
 from common.request_authorization import create_request_session
 from pathlib import Path
 from common.exceptions import ParsingException
 from common.utils import form_acceptable_name, request_get_image
 from tqdm import tqdm
-from typing import Literal
+
 
 import logging
 import time
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class Book(BookDB, BookEpub):
 
-    def __init__(self, book_link: str, site_name: Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net']):
+    def __init__(self, book_link: str, site_name: site_names_type):
         super().__init__(book_link)
         self.site_name = site_name
         # self.book_link = book_link
