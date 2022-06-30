@@ -1,22 +1,35 @@
-import re
-import time
-from typing import Literal
-import bs4
-from common.utils import create_soup
-from db_modules.db_common import BookDB
-from common.common import Book
-from bs4 import BeautifulSoup
-from requests import Session
-from requests.exceptions import JSONDecodeError
-from common.exceptions import GetPageSourseException, ParsingException
 import logging
-from common.project_types import ChapterInfo, BookInfo, site_names_type, book_status_type
+import re
 from datetime import datetime
-from common.request_authorization import create_auth_session
-from common.utils import form_acceptable_name
 from pathlib import Path
 
+import bs4
+from bs4 import BeautifulSoup
+from requests import Session
+
+from common.common import Book
+from common.exceptions import GetPageSourseException, ParsingException
+from common.project_types import BookInfo, site_names_type, book_status_type
+from common.request_authorization import create_auth_session
+from common.utils import create_soup
+from db_modules.db_common import BookDB
+
 logger = logging.getLogger(__name__)
+
+def _extract_book_link_ficbook(book_link_raw: str) -> str:
+    """Функция получения чистого book_link, без ссылок на главу и т.д."""
+    error_message = 'Ошибка извлечения ficbook link из неправильного адреса'
+    book_link_re = re.match(r'(/readfic/\d+)', book_link_raw)
+    if book_link_re is not None:
+        book_link = book_link_re.group(1)
+        if book_link:
+            return book_link
+        else:
+            logger.error(error_message)
+            raise ParsingException(error_message)
+    else:
+        logger.error(error_message)
+        raise ParsingException(error_message)
 
 
 class FicbookBook(Book, BookDB, BookInfo):
@@ -34,6 +47,7 @@ class FicbookBook(Book, BookDB, BookInfo):
                  "book_monitoring_status")
 
     def __init__(self, book_link: str, site_name: site_names_type = 'https://ficbook.net'):
+        book_link = _extract_book_link_ficbook(book_link)
         super().__init__(book_link, site_name)
 
     def downoload_book(self, session: Session | None = None, redownload: bool = False) -> Session:
@@ -58,14 +72,18 @@ class FicbookBook(Book, BookDB, BookInfo):
         file_name = self._create_file_name()
         file_path = Path('C:\\Users\\Necros\\YandexDisk\\books').joinpath(file_name)
         if response.status_code == 200:
-            try:
-                with open(file_path, 'wb') as file:
-                    file.write(response.content)
-                logger.info(f'C ficbook сохранена книга {file_name}')
-            except FileNotFoundError:
-                error_message = 'Ошибка сохранения fb2 файла книги на диск'
-                logger.error(error_message)
-                raise GetPageSourseException(error_message)
+            logger.debug(response.headers)
+            if response.headers['Content-Type'] == 'application/epub+zip':
+                try:
+                    with open(file_path, 'wb') as file:
+                        file.write(response.content)
+                    logger.info(f'C ficbook сохранена книга <bold>"{file_name}"</bold>')
+                except FileNotFoundError:
+                    error_message = 'Ошибка сохранения fb2 файла книги на диск'
+                    logger.error(error_message)
+                    raise GetPageSourseException(error_message)
+            else:
+                error_message = f'Ответ на запрос при скачивании {self.book_link} не является epub-файлом'
         else:
             error_message = f'Ошибка скачивания fb2 {self.book_link}'
             logger.error(error_message)
@@ -123,10 +141,9 @@ class FicbookBook(Book, BookDB, BookInfo):
     @staticmethod
     def _get_book_status(book_soup: BeautifulSoup) -> book_status_type:
         logger.debug('Получаем book_status')
-        book_status_raw = book_soup.find('div', class_=re.compile("badge-with-icon badge-secondary badge-status(.*)"))
-        if isinstance(book_status_raw, bs4.Tag):
-            book_status_raw: str = book_status_raw.get_text()
-            book_status_raw = book_status_raw.strip()
+        book_status_raw_tag = book_soup.find('div', class_=re.compile("badge-with-icon badge-secondary badge-status(.*)"))
+        if isinstance(book_status_raw_tag, bs4.Tag):
+            book_status_raw: str = book_status_raw_tag.get_text().strip()
             if book_status_raw == 'В процессе':
                 book_status: book_status_type = 'In progress'
             elif book_status_raw == 'Завершён':
@@ -183,7 +200,7 @@ class FicbookBook(Book, BookDB, BookInfo):
             raise ParsingException(error_message)
 
     @staticmethod
-    def _parse_book_dates(date_raw: bs4.Tag, error_message: str) -> int:
+    def _parse_book_dates(date_raw_tag: bs4.Tag, error_message: str) -> int:
         months = {'января': 'jan',
                   'февраля': 'feb',
                   'марта': 'mar',
@@ -196,13 +213,13 @@ class FicbookBook(Book, BookDB, BookInfo):
                   'октября': 'oct',
                   'ноября': 'nov',
                   'декабря': 'dec', }
-        if isinstance(date_raw, bs4.Tag):
-            date_raw = date_raw.get_text()
+        if isinstance(date_raw_tag, bs4.Tag):
+            date_raw = date_raw_tag.get_text()
             if isinstance(date_raw, str):
                 for month in months:
                     date_raw = date_raw.replace(month, months[month])
-                date_raw = datetime.strptime(date_raw, '%d %b %Y, %H:%M')
-                date = int(date_raw.timestamp())
+                datetime_raw = datetime.strptime(date_raw, '%d %b %Y, %H:%M')
+                date = int(datetime_raw.timestamp())
                 return date
             else:
                 logger.error(error_message)

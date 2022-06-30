@@ -1,10 +1,13 @@
-from site_parsers.sol.sol_monitoring import check_sol_updates
-from site_parsers.sfsb.sf_sb_monitoring import check_sf_sb_updates
-from site_parsers.wormstorysearch.wormstorysearch import check_wormstorysearch
-from datetime import datetime
-import schedule
 import logging.config
+from datetime import datetime
+
+import schedule
+
 from settings.settings import LOGGING_CONFIG
+from site_parsers.ficbook.ficbook_monitoring import check_ficbook_updates
+from site_parsers.sfsb.sf_sb_monitoring import check_sf_sb_updates
+from site_parsers.sol.sol_monitoring import check_sol_updates
+from site_parsers.wormstorysearch.wormstorysearch import check_wormstorysearch
 
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -19,7 +22,9 @@ def main() -> None:
     check_sf_sb_updates()
     print('Проверяем wormstorysearch.com')
     check_wormstorysearch()
-    print('Конец цикла\n', '*'*30)
+    print('проверяем ficbook_com')
+    check_ficbook_updates()
+    print('Конец цикла\n', '*'*30, '\n')
 
 
 

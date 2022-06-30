@@ -1,20 +1,23 @@
-from logging import Handler, LogRecord
-import dotenv
 import os
+from logging import Handler, LogRecord
+
+import dotenv
+
 from common.utils import send_telegram_message
 
 modules = (('__main__', 'DEBUG'),
            ('site_parsers.sol.sol_book', 'INFO'),
-           ('common.request_authorization', 'DEBUG'),
            ('site_parsers.sol.sol_requests_soup', 'INFO'),
            ('db_modules.db_common', 'INFO'),
            ('epub.epub', 'INFO'),
            ('site_parsers.sol.sol_monitoring', 'INFO'),
            ('site_parsers.sfsb.sf_sb_book', 'INFO'),
            ('site_parsers.sfsb.sf_sb_monitoring', 'INFO'),
-           ('site_parsers.ficbook.ficbook_book', 'DEBUG'),
+           ('site_parsers.ficbook.ficbook_book', 'INFO'),
+           ('site_parsers.ficbook.ficbook_monitoring', 'DEBUG'),
            ('common.utils', 'INFO'),
            ('common.common', 'INFO'),
+           ('common.request_authorization', 'INFO'),
            ('download_book', 'INFO'),
            ('monitoring', 'INFO')
            )
@@ -53,7 +56,6 @@ class TelegramBotHandler(Handler):
 
     def emit(self, record: LogRecord) -> None:
         send_telegram_message(self.format(record))
-
 
 
 handlers = {
