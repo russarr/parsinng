@@ -39,9 +39,11 @@ class AoooBook(Book, BookDB):
                  "book_series_order_position",
                  "book_votes_count",
                  "book_status",
-                 "book_monitoring_status")
+                 "book_monitoring_status",
+                 'epub_download_link')
 
     def __init__(self, book_link: str, site_name: Literal['https://archiveofourown.org'] = 'https://archiveofourown.org'):
+        book_link = self._clean_book_link(book_link)
         super().__init__(book_link, site_name)
         self.epub_download_link = ''
 
@@ -77,12 +79,12 @@ class AoooBook(Book, BookDB):
         self.add_book_to_db()
 
     def _download_epub(self, session: Session) -> None:
-        logger.debug(f'Скачиваем epub файл книги {self.book_link}')
+        logger.debug(f'Скачиваем epub файл книги {self.epub_download_link}')
         response = session.get(self.epub_download_link)
         file_name = self._create_file_name()
         file_path = Path('C:\\Users\\Necros\\YandexDisk\\books').joinpath(file_name)
         if response.status_code == 200:
-            logger.debug(response.headers)
+            logger.debug(f'{response.headers=}')
             if response.headers['Content-Type'] == 'application/epub+zip':
                 try:
                     with open(file_path, 'wb') as file:
@@ -107,7 +109,7 @@ class AoooBook(Book, BookDB):
         book_soup, chapters_list_soup = self.get_book_soup(session)
         self._get_book_details(book_soup)
         self._get_chapters_links(chapters_list_soup)
-        # self.epub_download_link = self._get_epub_download_link(book_soup)
+        self.epub_download_link = self._get_epub_download_link(book_soup)
         # self._create_book_directories()
         # self._get_book_size()
 
@@ -153,8 +155,9 @@ class AoooBook(Book, BookDB):
         self._get_book_tags(book_soup)
 
     def _get_book_title(self, book_soup: BeautifulSoup) -> None:
-        logger.debug('Получаем название книги')
+        logger.debug(f'Получаем название книги {self.book_link}')
         book_title_tag = book_soup.find(class_="title heading")
+        logger.debug(f'{book_title_tag=}')
         error_message = 'Ошибка получения названия книги'
         if isinstance(book_title_tag, bs4.Tag):
             book_title = book_title_tag.get_text()
@@ -314,3 +317,21 @@ class AoooBook(Book, BookDB):
             error_message = 'Ошибка получения даты главы'
             logger.error(error_message)
             raise ParsingException(error_message)
+
+    @staticmethod
+    def _clean_book_link(book_link: str) -> str:
+        logger.debug('приводим book_link к правильному виду')
+        book_link_re = re.match(r'(/works/\d+)', book_link)
+        if book_link_re:
+            book_link = book_link_re.group()
+            logger.debug(f'Чистый {book_link=}')
+            return book_link
+        else:
+            error_message = 'Ошибка удаления лишнего из book_link'
+            logger.error(error_message)
+            raise GetPageSourseException(error_message)
+
+    @staticmethod
+    def _create_auth_session() -> Session:
+        session = create_auth_session(site_alias='aooo')
+        return session
