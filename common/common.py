@@ -1,21 +1,21 @@
+import logging
+import random
+import time
+from pathlib import Path
+
 import requests.exceptions
 from bs4 import BeautifulSoup
-from db_modules.db_common import BookDB
-from epub.epub import BookEpub
 from requests import Session
-from db_modules.db_common import check_book_link_in_db
-from common.project_types import ChapterInfo, site_names_type
-from common.utils import create_soup
-from common.request_authorization import create_request_session
-from pathlib import Path
-from common.exceptions import ParsingException
-from common.utils import form_acceptable_name, request_get_image
 from tqdm import tqdm
 
-
-import logging
-import time
-import random
+from common.exceptions import ParsingException
+from common.project_types import ChapterInfo, site_names_type
+from common.request_authorization import create_request_session
+from common.utils import create_soup
+from common.utils import form_acceptable_name, request_get_image
+from db_modules.db_common import BookDB
+from db_modules.db_common import check_book_link_in_db
+from epub.epub import BookEpub
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class Book(BookDB, BookEpub):
         logger.debug(f'Начинаем скачивание книги {self.book_link}')
 
         self._get_book_info(session)
-        for chapter in tqdm(self.chapters_info_list):
+        for chapter in tqdm(self.chapters_info_list, desc='Скачивание всех глав книги', colour='green'):
             try:
                 self._download_chapter(chapter, session)
             except requests.exceptions.ConnectionError:  # в случае потери соединенеия, переподключение через 30с
@@ -64,7 +64,8 @@ class Book(BookDB, BookEpub):
         book_updated_date_in_db = self.book_updated_date
         self._get_book_info(session)
         if self.book_updated_date > book_updated_date_in_db:
-            for chapter in tqdm(self.chapters_info_list):
+            logger.debug(f'{self.book_updated_date}, {book_updated_date_in_db}')
+            for chapter in tqdm(self.chapters_info_list, desc='Скачивание обновленных глав книги', colour='green'):
                 if chapter.chapter_link not in sorted_chapters_list_in_db[:-1]:
                     self._download_chapter(chapter, session)
                     time.sleep(random.randint(1, 3))
@@ -91,13 +92,16 @@ class Book(BookDB, BookEpub):
         book_path = Path(*book_directory)
         book_images_path = book_path.joinpath('Images')
         book_texts_path = book_path.joinpath('Text')
-        try:
-            book_images_path.mkdir(parents=True, exist_ok=True)
-            book_texts_path.mkdir(parents=True, exist_ok=True)
-        except PermissionError:
-            error_message = f'Ошибка создания папки на диске {book_directory}'
-            logger.exception(error_message)
-            raise ParsingException(error_message)
+        if not book_texts_path.exists() and not book_images_path.exists():
+            try:
+                book_images_path.mkdir(parents=True, exist_ok=True)
+                book_texts_path.mkdir(parents=True, exist_ok=True)
+            except PermissionError:
+                error_message = f'Ошибка создания папки на диске {book_directory}'
+                logger.exception(error_message)
+                raise ParsingException(error_message)
+        else:
+            logger.debug('Директории уже существуют')
 
         self.book_directory = book_path
         logger.debug(f'{self.book_directory=}')

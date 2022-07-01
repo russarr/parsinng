@@ -1,13 +1,22 @@
 import logging
-from common.exceptions import GetPageSourseException  # type: ignore
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from common.exceptions import GetPageSourseException  # type: ignore
+
 logger = logging.getLogger(__name__)
 
-site_names_type = Literal['https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com', 'https://storiesonline.net', 'https://ficbook.net']
+site_names_type = Literal['https://forums.sufficientvelocity.com',
+                          'https://forums.spacebattles.com',
+                          'https://storiesonline.net',
+                          'https://ficbook.net',
+                          'https://archiveofourown.org']
+
+site_alias_list = Literal['sol', 'ficbook', 'aooo', 'sf_sb', None]
+
 book_status_type = Literal['In progress', 'Concluded', 'Frozen', 'Unknown']
+
 
 @dataclass
 class ChapterInfo:

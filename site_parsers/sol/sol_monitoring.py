@@ -1,17 +1,18 @@
-import time
-
-from common.request_authorization import create_auth_session
-from requests import Session
-from bs4 import BeautifulSoup
-from common.exceptions import GetPageSourseException, ParsingException
-from site_parsers.sol.sol_book import SolBook
-from common.utils import create_soup
-import pickle
 import logging
-from typing import Literal
+import pickle
+import time
 from pathlib import Path
-from db_modules.db_common import get_sol_monitoring_authors_list, get_sf_sb_monitoring_stories_list
+from typing import Literal
+
+from bs4 import BeautifulSoup
+from requests import Session
 from tqdm import tqdm
+
+from common.exceptions import GetPageSourseException, ParsingException
+from common.request_authorization import create_auth_session
+from common.utils import create_soup
+from db_modules.db_common import get_sol_monitoring_authors_list, get_monitoring_stories_list
+from site_parsers.sol.sol_book import SolBook
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ def _check_sol_updates_page(session: Session) -> None:
     page_soup = _get_upd_new_page_soup(session, 'upd')
     upd_stories_list = _get_upd_stories_download_list(page_soup)
     print('Проверяем страницу с обновленными историями')
-    for book_link in tqdm(upd_stories_list):
+    for book_link in tqdm(upd_stories_list, desc='Скачивание обновленных книг sol', colour='green'):
         book = SolBook(book_link)
         book.downoload_book(session)
         time.sleep(3)
@@ -38,7 +39,7 @@ def _check_sol_new_story_page(session: Session) -> None:
     print('Проверяем страницу с новыми историями')
     page_soup = _get_upd_new_page_soup(session, 'new')
     new_stories_list = get_new_stories_download_list(page_soup)
-    for book_link in tqdm(new_stories_list):
+    for book_link in tqdm(new_stories_list, desc='Скачивание новых книг sol', colour='green'):
         book = SolBook(book_link)
         book.downoload_book(session)
         time.sleep(3)
@@ -99,8 +100,12 @@ def _get_upd_new_page_soup(session: Session, page_type: Literal['new', 'upd']) -
 
 def _get_upd_stories_download_list(page_soup: BeautifulSoup) -> tuple[str, ...]:
     link_list = _get_updates_stories_link_list(page_soup)
-    monitoring_list = get_sf_sb_monitoring_stories_list()
+    logger.debug(f'{link_list=}')
+    monitoring_list = [link[0] for link in get_monitoring_stories_list('sol')]
+    logger.debug(f'{monitoring_list=}')
     list_to_download = tuple(link for link in link_list if link in monitoring_list)
+    logger.debug(f'{list_to_download=}')
+
     return list_to_download
 
 

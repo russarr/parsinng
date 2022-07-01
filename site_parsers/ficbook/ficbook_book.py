@@ -77,7 +77,7 @@ class FicbookBook(Book, BookDB, BookInfo):
                 try:
                     with open(file_path, 'wb') as file:
                         file.write(response.content)
-                    logger.info(f'C ficbook сохранена книга <bold>"{file_name}"</bold>')
+                    logger.info(f'C ficbook сохранена книга: "{file_name}"')
                 except FileNotFoundError:
                     error_message = 'Ошибка сохранения fb2 файла книги на диск'
                     logger.error(error_message)

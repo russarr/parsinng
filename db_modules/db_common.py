@@ -1,9 +1,10 @@
 import logging
-from datetime import datetime
-from common.project_types import BookInfo, ChapterInfo
-from common.exceptions import DataBaseExceptions
-from pathlib import Path
 import sqlite3 as sq
+from datetime import datetime
+from pathlib import Path
+
+from common.exceptions import DataBaseExceptions
+from common.project_types import BookInfo, ChapterInfo, site_alias_list
 
 logger = logging.getLogger(__name__)
 
@@ -117,15 +118,26 @@ def check_book_link_in_db(book_link: str) -> bool:
         return True if cur.fetchone() else False
 
 
-def get_sf_sb_monitoring_stories_list() -> tuple[tuple[str, str], ...]:
+def get_monitoring_stories_list(site_alias: site_alias_list) -> tuple[tuple[str, str], ...]:
+    match site_alias:
+        case 'sf_sb':
+            site_name_list = ('https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com')
+        case 'sol':
+            site_name_list = ('https://storiesonline.net', '')
+        case 'aooo':
+            site_name_list = ('https://archiveofourown.org', '')
+        case _:
+            error_message = 'Не указан alias для сайта при выборе списка мониторинга'
+            logger.error(error_message)
+            raise DataBaseExceptions
     db_path = check_db_file()
     with sq.connect(db_path) as books_db:
         cur = books_db.cursor()
         cur.execute("""SELECT book_link, site_name
             FROM books
             WHERE book_monitor_status = 1
-            AND site_name IN ('https://forums.sufficientvelocity.com', 'https://forums.spacebattles.com')
-            AND book_status != 'Concluded'""")
+            AND site_name IN (?,?)
+            AND book_status != 'Concluded'""", site_name_list)
         monitoring_book_list = tuple((book[0], book[1]) for book in cur.fetchall() if book)
     return monitoring_book_list
 

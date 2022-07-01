@@ -4,6 +4,7 @@ from datetime import datetime
 import schedule
 
 from settings.settings import LOGGING_CONFIG
+from site_parsers.archiveofourown.aooo_monitoring import check_aooo_updates
 from site_parsers.ficbook.ficbook_monitoring import check_ficbook_updates
 from site_parsers.sfsb.sf_sb_monitoring import check_sf_sb_updates
 from site_parsers.sol.sol_monitoring import check_sol_updates
@@ -24,6 +25,8 @@ def main() -> None:
     check_wormstorysearch()
     print('проверяем ficbook_com')
     check_ficbook_updates()
+    print('проверяем archiveofourown.org')
+    check_aooo_updates()
     print('Конец цикла\n', '*'*30, '\n')
 
 
