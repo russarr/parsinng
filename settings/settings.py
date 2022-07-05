@@ -17,6 +17,7 @@ modules = (('__main__', 'DEBUG'),
            ('site_parsers.ficbook.ficbook_monitoring', 'INFO'),
            ('site_parsers.archiveofourown.aooo', 'INFO'),
            ('site_parsers.archiveofourown.aooo_monitoring', 'INFO'),
+           ('site_parsers.youtube.youtube', 'INFO'),
            ('common.utils', 'INFO'),
            ('common.common', 'INFO'),
            ('common.request_authorization', 'INFO'),
@@ -57,7 +58,7 @@ class TelegramBotHandler(Handler):
         self.chat_id = chat_id
 
     def emit(self, record: LogRecord) -> None:
-        send_telegram_message(self.format(record))
+        send_telegram_message(channel_name='common', text=self.format(record))
 
 
 handlers = {

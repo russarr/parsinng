@@ -1,14 +1,16 @@
-import fake_useragent
 import logging
-import requests
-from bs4 import BeautifulSoup
-from common.project_types import BookInfo
-from common.exceptions import GetPageSourseException
-from typing import Callable
-import re
-import dotenv
 import os
+import re
+from typing import Callable, Literal
+
+import dotenv
+import fake_useragent
+import requests
 import urllib3
+from bs4 import BeautifulSoup
+
+from common.exceptions import GetPageSourseException
+from common.project_types import BookInfo
 
 logger = logging.getLogger(__name__)
 
@@ -60,13 +62,29 @@ def form_acceptable_name(file_name: str, file_name_length: int) -> str:
     return file_name.strip()
 
 
-def send_telegram_message(text: str) -> None:
+def send_telegram_message(channel_name: Literal['book_chat', 'youtube_chat', 'common'], text: str) -> None:
     dotenv.load_dotenv()
     token = os.getenv('TELEGRAM_BOT_TOKEN')
-    chat_id = os.getenv('TELEGRAM_CHAT_ID')
+    book_chat_id = os.getenv('TELEGRAM_BOOK_CHAT_ID')
+    youtube_chat_id = os.getenv('TELEGRAM_YOUTUBE_CHAT_ID')
+    common_chat_id = os.getenv('TELEGRAM_COMMON_CHAT_ID')
+    match channel_name:
+        case 'book_chat':
+            chat_id = book_chat_id
+        case 'youtube_chat':
+            chat_id = youtube_chat_id
+        case 'common':
+            chat_id = common_chat_id
+        case _:
+            error_message = 'Не указан telegram канал'
+            logger.error(error_message)
+            raise GetPageSourseException(error_message)
+
 
     url = f'https://api.telegram.org/bot{token}/sendMessage'
     post_data = {'chat_id': chat_id,
                  'text': text}
     http = urllib3.PoolManager()
+    logger.debug(f'{token=}, {chat_id=}, {text=}')
+
     http.request(method='POST', url=url, fields=post_data)

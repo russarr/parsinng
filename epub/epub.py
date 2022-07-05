@@ -1,10 +1,11 @@
+import logging
 import zipfile
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 from common.exceptions import CompileException
 from common.project_types import BookInfo
-import logging
-from common.utils import form_acceptable_name
+from common.utils import form_acceptable_name, send_telegram_message
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class BookEpub(BookInfo):
                     zf.writestr('OEBPS/Text/' + chapter[0], chapter[1])
                 for image in images_files:
                     zf.write(image[1], 'OEBPS/Images/' + image[0])
-                logger.info(f'Сохранена книга {file_name}')
+                send_telegram_message('book_chat', f'Сохранена книга {file_name}')
         except OSError as e:
             error_message = f'Ошибка при архивации epub файла: {e}'
             raise CompileException(error_message)

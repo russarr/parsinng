@@ -92,7 +92,7 @@ class Book(BookDB, BookEpub):
         book_path = Path(*book_directory)
         book_images_path = book_path.joinpath('Images')
         book_texts_path = book_path.joinpath('Text')
-        if not book_texts_path.exists() and not book_images_path.exists():
+        if not book_texts_path.exists() or not book_images_path.exists():
             try:
                 book_images_path.mkdir(parents=True, exist_ok=True)
                 book_texts_path.mkdir(parents=True, exist_ok=True)
